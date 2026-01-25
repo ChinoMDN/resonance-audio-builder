@@ -1,11 +1,10 @@
 import os
 import threading
-import time
 from collections import deque
-from typing import Dict, Set
+from typing import Dict
 
 from rich.align import Align
-from rich.console import Console, Group
+from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
@@ -214,7 +213,7 @@ Active Workers: {pending_count}
         try:
             if task_id in self.job_progress._tasks:
                 self.job_progress.remove_task(task_id)
-        except:
+        except Exception:
             pass
 
     def add_log(self, msg: str):
@@ -232,6 +231,6 @@ Active Workers: {pending_count}
         t.add_row("Successful", str(stats.get("ok", 0)))
         t.add_row("Skipped", str(stats.get("skip", 0)))
         t.add_row("Failed", str(stats.get("error", 0)))
-        t.add_row("Total Data", f"{stats.get('bytes', 0) / (1024*1024):.2f} MB")
+        t.add_row("Total Data", f"{stats.get('bytes', 0) / (1024 * 1024):.2f} MB")
 
         console.print(t)

@@ -1,11 +1,8 @@
 import asyncio
 import csv
 import os
-import queue
-import time
 import traceback
 from datetime import datetime
-from pathlib import Path
 from typing import List, Tuple
 
 from rich.panel import Panel
@@ -21,7 +18,7 @@ from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
 from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import RichUI, clear_screen, console, format_size, format_time, print_header
+from resonance_audio_builder.core.ui import RichUI, clear_screen, console, print_header
 from resonance_audio_builder.core.utils import export_m3u, save_history
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager
@@ -157,7 +154,7 @@ class DownloadManager:
                 try:
                     self.queue.get_nowait()
                     self.queue.task_done()
-                except:
+                except Exception:
                     break
 
             self.keyboard.stop()
@@ -279,7 +276,7 @@ class DownloadManager:
                     writer.writeheader()
                     for track, _ in self.failed_tracks:
                         writer.writerow(track.raw_data)
-        except:
+        except Exception:
             pass
 
     def _print_summary(self):
@@ -326,7 +323,7 @@ class DownloadManager:
                 if m3u_tracks:
                     export_m3u(m3u_tracks, self.cfg.M3U_FILE)
                     print(f"  [i] Playlist M3U: {self.cfg.M3U_FILE}")
-            except:
+            except Exception:
                 pass
 
         print("=" * 60)

@@ -3,7 +3,7 @@ import os
 import random
 import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 import aiohttp
 
@@ -123,7 +123,7 @@ class SmartProxyManager:
                         proxy.failures += 1
 
                     return proxy.healthy
-        except:
+        except Exception:
             proxy.healthy = False
             proxy.failures += 1
             return False

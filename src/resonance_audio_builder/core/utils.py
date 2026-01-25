@@ -13,7 +13,7 @@ def calculate_md5(file_path: Path) -> str:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
-    except:
+    except Exception:
         return ""
 
 
@@ -25,7 +25,7 @@ def export_m3u(tracks: List[Tuple[str, str, int]], filepath: str):
             for path, title, duration in tracks:
                 f.write(f"#EXTINF:{duration},{title}\n")
                 f.write(f"{path}\n")
-    except:
+    except Exception:
         pass
 
 
@@ -36,7 +36,7 @@ def save_history(history_file: str, session_data: dict):
         try:
             with open(history_file, "r", encoding="utf-8") as f:
                 history = json.load(f)
-        except:
+        except Exception:
             pass
 
     history.append(session_data)
@@ -48,5 +48,5 @@ def save_history(history_file: str, session_data: dict):
     try:
         with open(history_file, "w", encoding="utf-8") as f:
             json.dump(history, f, indent=2, ensure_ascii=False)
-    except:
+    except Exception:
         pass

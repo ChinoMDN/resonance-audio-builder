@@ -2,8 +2,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.core.config import Config

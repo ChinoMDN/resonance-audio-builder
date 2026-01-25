@@ -4,13 +4,13 @@ import os
 import random
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import yt_dlp
 
 from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.core.config import Config
-from resonance_audio_builder.core.exceptions import NotFoundError, YouTubeError
+from resonance_audio_builder.core.exceptions import NotFoundError
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager

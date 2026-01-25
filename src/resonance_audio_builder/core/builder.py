@@ -5,7 +5,7 @@ import os
 import shutil
 import traceback
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -173,7 +173,7 @@ class App:
                     if len(rows) > 0 and reader.fieldnames:
                         self.log.info(f"[i] Codificación: {enc}")
                         return rows
-            except:
+            except Exception:
                 continue
 
         print(f"[!] Error leyendo CSV: {filepath}")
@@ -238,7 +238,7 @@ class App:
         except Exception:
             with open("crash.log", "w", encoding="utf-8") as f:
                 f.write(traceback.format_exc())
-            console.print(f"\n[bold red][!] Error crítico guardado en crash.log[/bold red]")
+            console.print("\n[bold red][!] Error crítico guardado en crash.log[/bold red]")
 
         console.input("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
 
@@ -313,14 +313,14 @@ class App:
             if os.path.exists("cache.db"):
                 try:
                     os.remove("cache.db")
-                except:
+                except Exception:
                     pass
 
             # Legacy JSON cache
             if os.path.exists(self.cfg.CACHE_FILE):
                 try:
                     os.remove(self.cfg.CACHE_FILE)
-                except:
+                except Exception:
                     pass
 
         # Clear Progress
@@ -335,7 +335,7 @@ class App:
                 try:
                     os.remove(self.cfg.HISTORY_FILE)
                     deleted.append("History")
-                except:
+                except Exception:
                     pass
 
             # M3U playlist
@@ -343,7 +343,7 @@ class App:
                 try:
                     os.remove(self.cfg.M3U_FILE)
                     deleted.append("Playlist M3U")
-                except:
+                except Exception:
                     pass
 
         if deleted:
@@ -362,7 +362,7 @@ class App:
                 winsound.MessageBeep(winsound.MB_ICONASTERISK)
             else:
                 print("\a")
-        except:
+        except Exception:
             pass
 
     def watch_mode(self, folder: str):

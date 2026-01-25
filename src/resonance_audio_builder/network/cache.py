@@ -40,7 +40,7 @@ class CacheManager:
                 row = self.cursor.fetchone()
                 if row:
                     return {"url": row[0], "title": row[1], "duration": row[2]}
-            except:
+            except Exception:
                 pass
             return None
 
@@ -57,7 +57,7 @@ class CacheManager:
                     (key, data["url"], data["title"], data.get("duration", 0), time.time()),
                 )
                 self.conn.commit()
-            except:
+            except Exception:
                 pass
 
     def clear(self):
@@ -82,5 +82,5 @@ class CacheManager:
             try:
                 self.cursor.execute("SELECT COUNT(*) FROM cache")
                 return self.cursor.fetchone()[0]
-            except:
+            except Exception:
                 return 0

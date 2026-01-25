@@ -94,6 +94,6 @@ class Config:
                 for json_key, attr in mapping.items():
                     if json_key in data:
                         setattr(cfg, attr, data[json_key])
-            except Exception as e:
+            except Exception:
                 pass  # Usar valores por defecto si falla
         return cfg

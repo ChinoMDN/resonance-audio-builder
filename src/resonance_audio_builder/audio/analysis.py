@@ -55,7 +55,6 @@ class AudioAnalyzer:
             # o valores como -90.5 dB
 
             output = result.stderr
-            rms_level = float("-inf")
 
             import re
 

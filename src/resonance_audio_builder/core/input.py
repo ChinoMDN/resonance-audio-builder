@@ -81,7 +81,7 @@ class KeyboardController:
             def restore():
                 try:
                     termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
-                except:
+                except Exception:
                     pass
 
             atexit.register(restore)
@@ -96,7 +96,7 @@ class KeyboardController:
                 finally:
                     termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
                 time.sleep(0.05)
-        except:
+        except Exception:
             pass
 
     def _handle_key(self, key: str):

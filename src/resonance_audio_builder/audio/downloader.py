@@ -3,7 +3,6 @@ import io
 import json
 import os
 import random
-import subprocess
 import tempfile
 import time
 from dataclasses import dataclass
@@ -18,7 +17,7 @@ from PIL import Image
 
 from resonance_audio_builder.audio.analysis import AudioAnalyzer
 from resonance_audio_builder.audio.metadata import TrackMetadata
-from resonance_audio_builder.audio.youtube import SearchResult, YouTubeSearcher
+from resonance_audio_builder.audio.youtube import SearchResult
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.exceptions import (
     CopyrightError,
@@ -26,7 +25,6 @@ from resonance_audio_builder.core.exceptions import (
     GeoBlockError,
     NotFoundError,
     RecoverableError,
-    TranscodeError,
     YouTubeError,
 )
 from resonance_audio_builder.core.logger import Logger
@@ -121,7 +119,7 @@ class AudioDownloader:
                 img = img.convert("RGB")
             img.save(output, format="JPEG", quality=85, optimize=True)
             return output.getvalue()
-        except:
+        except Exception:
             return image_data
 
     async def download(
@@ -235,7 +233,7 @@ class AudioDownloader:
             if raw_path and raw_path.exists():
                 try:
                     os.remove(raw_path)
-                except:
+                except Exception:
                     pass
 
     async def _download_cover(self, url: str) -> Optional[bytes]:
@@ -264,11 +262,11 @@ class AudioDownloader:
         try:
             try:
                 audio = MP3(str(file_path), ID3=ID3)
-            except:
+            except Exception:
                 audio = MP3(str(file_path))
             try:
                 audio.delete()
-            except:
+            except Exception:
                 pass
 
             audio = MP3(str(file_path))
@@ -379,7 +377,7 @@ class AudioDownloader:
                             if f.stem == stem:
                                 self.log.debug(f"Recovered file with different ext: {f}")
                                 return f
-                    except:
+                    except Exception:
                         pass
 
                 return final_path
@@ -398,7 +396,7 @@ class AudioDownloader:
             if "copyright" in err_str or "blocked" in err_str:
                 raise CopyrightError(f"Bloqueado: {str(e)[:50]}")
             elif "not available" in err_str or "geo" in err_str:
-                raise GeoBlockError(f"No disponible en tu región")
+                raise GeoBlockError("No disponible en tu región")
             elif "sign in" in err_str or "age" in err_str:
                 raise FatalError(f"Requiere login: {str(e)[:50]}")
             else:
@@ -446,7 +444,7 @@ class AudioDownloader:
             if output_path.exists():
                 try:
                     os.remove(output_path)
-                except:
+                except Exception:
                     pass
             return False
 
@@ -455,6 +453,6 @@ class AudioDownloader:
             if output_path.exists():
                 try:
                     os.remove(output_path)
-                except:
+                except Exception:
                     pass
             return False

@@ -29,7 +29,7 @@ def fetch_lyrics(artist: str, title: str, duration_sec: int = 0) -> Optional[str
             lyrics = data.get("syncedLyrics") or data.get("plainLyrics")
             if lyrics and len(lyrics) > 50:
                 return lyrics
-    except:
+    except Exception:
         pass
 
     # 2. Fallback a lyrics.ovh (API gratuita)
@@ -41,7 +41,7 @@ def fetch_lyrics(artist: str, title: str, duration_sec: int = 0) -> Optional[str
             lyrics = data.get("lyrics", "")
             if lyrics and len(lyrics) > 50:
                 return lyrics.strip()
-    except:
+    except Exception:
         pass
 
     return None

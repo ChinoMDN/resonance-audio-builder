@@ -17,5 +17,5 @@ def validate_cookies_file(filepath: str) -> bool:
         with open(path, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()
             return first_line.startswith("# Netscape HTTP Cookie File") or first_line.startswith("# HTTP Cookie File")
-    except:
+    except Exception:
         return False

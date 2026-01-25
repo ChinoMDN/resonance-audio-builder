@@ -23,7 +23,7 @@ class MetadataWriter:
             # Cargar o crear tags
             try:
                 audio = MP3(str(path), ID3=ID3)
-            except:
+            except Exception:
                 audio = MP3(str(path))
 
             if audio.tags is None:

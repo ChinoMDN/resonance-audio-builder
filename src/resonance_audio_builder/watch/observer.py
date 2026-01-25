@@ -1,14 +1,13 @@
 import os
+import threading
 import time
-from pathlib import Path
 
 from rich.console import Console
+from rich.panel import Panel
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 console = Console()
-
-import threading
 
 
 class PlaylistEventHandler(FileSystemEventHandler):
@@ -57,7 +56,7 @@ class PlaylistEventHandler(FileSystemEventHandler):
             # Invocar al App builder para procesar
             # Usamos _start_download pasando la lista explícita y SIN preguntar calidad
             self.app._start_download([filepath], ask_quality=False)
-            console.print(f"\n[bold blue]👀 Resume watching...[/bold blue]")
+            console.print("\n[bold blue]👀 Resume watching...[/bold blue]")
         except Exception as e:
             console.print(f"[bold red]Error processing file:[/bold red] {e}")
 
@@ -87,6 +86,3 @@ def start_observer(path: str, app_instance):
         console.print("\n[yellow]Stopping watchdog...[/yellow]")
 
     observer.join()
-
-
-from rich.panel import Panel

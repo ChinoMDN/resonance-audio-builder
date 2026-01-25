@@ -20,7 +20,7 @@ class Logger:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             with open("debug.log", "a", encoding="utf-8") as f:
                 f.write(f"[{timestamp}] {msg_clean}\n")
-        except:
+        except Exception:
             pass
 
     def _log(self, level, msg, style):
