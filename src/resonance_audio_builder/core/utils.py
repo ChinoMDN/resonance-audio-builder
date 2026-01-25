@@ -7,7 +7,7 @@ from typing import List, Tuple
 
 def calculate_md5(file_path: Path) -> str:
     """Calcula hash MD5 de un archivo"""
-    hash_md5 = hashlib.md5()  # nosec B324
+    hash_md5 = hashlib.md5(usedforsecurity=False)
     try:
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):

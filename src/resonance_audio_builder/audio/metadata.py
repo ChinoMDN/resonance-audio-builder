@@ -37,9 +37,9 @@ class TrackMetadata:
         if isrc:
             track_id = f"isrc_{isrc}"
             if not track_id:
-                track_id = hashlib.md5(f"{artist}_{title}".encode()).hexdigest()[:16]  # nosec B324
+                track_id = hashlib.md5(f"{artist}_{title}".encode(), usedforsecurity=False).hexdigest()[:16]
         else:
-            track_id = hashlib.md5(f"{artist}_{title}".encode()).hexdigest()[:16]  # nosec B324
+            track_id = hashlib.md5(f"{artist}_{title}".encode(), usedforsecurity=False).hexdigest()[:16]
 
         duration_str = get_val("track duration (ms)", "duration_ms", "duration")
         duration = int(duration_str) if duration_str and duration_str.isdigit() else 0

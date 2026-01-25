@@ -12,7 +12,15 @@ class TestYouTubeSearcher:
     def searcher(self, mock_youtube_api):
         # Patch yt_dlp.YoutubeDL at the import location in youtube.py
         mock_youtube_api.__enter__.return_value = mock_youtube_api
-        with patch("resonance_audio_builder.audio.youtube.yt_dlp.YoutubeDL", return_value=mock_youtube_api):
+
+        # We also mock run_in_executor to avoid thread leaks during teardown on Linux/macOS
+        async def mock_run(executor, func, *args):
+            return func(*args)
+
+        with (
+            patch("resonance_audio_builder.audio.youtube.yt_dlp.YoutubeDL", return_value=mock_youtube_api),
+            patch("asyncio.AbstractEventLoop.run_in_executor", new=mock_run),
+        ):
             # Ensure cache doesn't return mocks that act as True
             mock_cache = MagicMock()
             mock_cache.get.return_value = None
