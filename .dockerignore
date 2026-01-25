@@ -12,6 +12,7 @@ ENV/
 env/
 dist/
 build/
+*.spec
 *.egg-info/
 .git
 .github
