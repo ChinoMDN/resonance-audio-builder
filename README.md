@@ -9,6 +9,12 @@ Build and manage a personal audio library using publicly accessible media source
 
 ---
 
+> [!IMPORTANT]
+> **Project Status: Maintenance Mode**
+> This project is now in maintenance mode. Only critical bug fixes and security updates will be provided. If you're looking for advanced features or platform-specific integrations, we encourage you to **fork the repository** and implement them yourselves.
+
+---
+
 ## Table of Contents
 
 - [Why Resonance?](#why-resonance)
