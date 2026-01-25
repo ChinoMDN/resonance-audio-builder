@@ -1,4 +1,5 @@
 def main() -> None:
-    from .library_builder import main as run
+    from resonance_audio_builder.core.builder import App
 
-    run()
+    app = App()
+    app.run()

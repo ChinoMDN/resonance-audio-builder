@@ -50,14 +50,15 @@ Resonance focuses on **library quality and consistency**, providing:
 | Feature                    | Description                                                   |
 | -------------------------- | ------------------------------------------------------------- |
 | **Rich UI**                | Professional terminal interface with live progress            |
+| **Spectral Analysis**      | **NEW!** Detects fake HG audio (upscaled 128kbps)             |
+| **Watchdog Mode**          | **NEW!** Auto-downloads when you drop CSVs into `Playlists/`  |
 | **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources) |
 | **Multi-profile Encoding** | Configurable high and low bitrate audio profiles              |
 | **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume             |
 | **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                      |
 | **Smart Matching**         | ISRC-based matching with text-search fallback                 |
 | **Resume Support**         | Checkpoint-based recovery for interrupted sessions            |
-| **Rate Limiting**          | Adaptive delays for network stability                         |
-| **Real-time Controls**     | Pause, skip, and graceful shutdown                            |
+| **Organized Output**       | **NEW!** Auto-sorts lists into subfolders                     |
 
 ---
 
@@ -74,39 +75,19 @@ Resonance focuses on **library quality and consistency**, providing:
 ```bash
 git clone https://github.com/ChinoMDN/resonance-audio-builder.git
 cd resonance-audio-builder
-pip install -e .
+pip install -r requirements.txt
 ```
-
-Or install with development dependencies:
-
-```bash
-pip install -e ".[dev]"
-```
-
-### Build Executable (Windows)
-
-Run `build_exe.bat` to generate a standalone executable in the `dist/` directory.
 
 ### Usage
 
-1. Export a track list to CSV (e.g. from a music library manager)
-2. Place the CSV file in the project root
-3. Run:
+1. **Standard Mode:**
+    - Export your playlist to CSV and place it in the `Playlists/` folder.
+    - Run: `python run.py`
+    - Select "Start download" -> "All Files" or specific file.
 
-```bash
-python -m resonance_audio_builder
-```
-
-4. Follow the interactive menu:
-
-```
-+-- Main Menu -------------------------------------------+
-|  [1] Process library from CSV                         |
-|  [2] Retry failed entries                             |
-|  [3] Clear cache/progress                             |
-|  [4] Exit                                             |
-+-------------------------------------------------------+
-```
+2. **Watchdog Mode (Automation):**
+    - Run: `python run.py --watch`
+    - Drop any CSV file into `Playlists/`. The download will start automatically!
 
 ---
 
@@ -180,9 +161,15 @@ Lyrics are embedded using standard ID3 tags and are compatible with most players
 Some publicly accessible media sources may rely on session-based access.
 Resonance supports optional user-provided cookies to replicate standard browser requests.
 
-This feature does not circumvent DRM, paywalls, or restricted content.
+### Proxies & OpSec
 
-Use a dedicated browser profile/account when exporting cookies to reduce risk.
+To use proxies:
+
+1. Create a `proxies.txt` file in the project root.
+2. Add proxies (one per line): `protocol://user:pass@ip:port` or `ip:port`.
+3. Enable in `config.py` or set `USE_PROXIES = True`.
+
+This feature does not circumvent DRM, paywalls, or restricted content.
 
 ---
 
@@ -195,27 +182,24 @@ Use a dedicated browser profile/account when exporting cookies to reduce risk.
 | `Q`      | Quit gracefully (saves progress) |
 | `Ctrl+C` | Force quit                       |
 
----
-
 ## Project Structure
 
 ```
 resonance-audio-builder/
 ├── src/
 │   └── resonance_audio_builder/
-│       ├── __init__.py
-│       ├── __main__.py
-│       ├── cli.py
-│       └── library_builder.py
+│       ├── core/           # Config, Builder, State management
+│       ├── audio/          # Downloader, Metadata, Analysis (FFmpeg)
+│       ├── network/        # Caching, Rate limiting
+│       ├── watch/          # Watchdog observer code
+│       ├── cli.py          # Entry point
+│       └── __main__.py
+├── Playlists/              # Input folder for CSVs (Auto-created)
 ├── tests/
-│   ├── conftest.py
-│   └── test_library_builder.py
 ├── pyproject.toml
 ├── config.json
 ├── requirements.txt
-├── build_exe.bat
-├── Dockerfile
-├── .github/workflows/
+├── run.py                  # Access point
 └── README.md
 ```
 

@@ -7,6 +7,27 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [7.0.0] – 2026-01-24
+
+### Added
+
+- **Spectral Analysis:** Automatic integrity check to detect "fake" 320kbps files (upscaled 128kbps) using FFmpeg.
+- **Watchdog Mode:** New `--watch` flag to monitor the `Playlists/` directory and auto-start downloads when CSVs are added.
+- **Playlist Organization:**
+    - Dedicated `Playlists/` input directory.
+    - Output files are now organized into subfolders matching the CSV filename (e.g., `Audio_HQ/MyPlaylist/Song.mp3`).
+- **Multi-CSV Support:** Ability to process all CSV files in the input directory at once from the menu.
+- **Proxy/OpSec Support:** Centralized `ProxyManager` reading from `proxies.txt` to rotate IPs for YouTube searches and downloads.
+- **Configurable Input:** Added `INPUT_FOLDER`, `PROXIES_FILE`, and `USE_PROXIES` settings in `config.py`.
+
+### Changed
+
+- **Modular Architecture:** Complete refactor from monolithic `library_builder.py` to a domain-driven `core/`, `audio/`, `network/`, `watch/` package structure.
+- **CLI improvements:** Streamlined menu and quality selection for batch processing.
+- **Dependencies:** Added `watchdog` to `requirements.txt`.
+
+---
+
 ## [6.0.0] – 2026-01-24
 
 ### Added

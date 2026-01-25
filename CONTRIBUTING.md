@@ -101,6 +101,19 @@ Consistency and readability are prioritized over micro-optimizations.
 
 ---
 
+## Code Structure (v7.0)
+
+The project follows a domain-driven modular architecture:
+
+- `src/resonance_audio_builder/core`: Configuration, Builder, App state.
+- `src/resonance_audio_builder/audio`: Downloader, Metadata, Analysis, Lyrics.
+- `src/resonance_audio_builder/network`: Networking primitives, Cache, Rate limiting.
+- `src/resonance_audio_builder/watch`: Watchdog observer.
+
+Please place new code in the appropriate module.
+
+---
+
 ## Commit Message Format
 
 Use a conventional commit format:
