@@ -18,7 +18,7 @@ pyinstaller --clean ^
             --onefile ^
             --name "ResonanceMusicBuilder" ^
             --collect-all rich ^
-            src/library_builder.py
+            src/resonance_audio_builder/library_builder.py
 
 echo.
 echo ===========================================

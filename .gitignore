@@ -1,14 +1,14 @@
 # Archivos de descarga
-Downloads_HQ/
-Downloads_Mobile/
+Audio_Mobile/
+Audio_HQ/
 
 # Archivos de estado
-progreso.json
+progress.json
 youtube_cache.json
 cache.db
-canciones_fallidas.txt
-canciones_fallidas.csv
-historial.json
+Failed_songs.txt
+Failed_songs.csv
+history.json
 playlist.m3u
 
 # Datos sensibles

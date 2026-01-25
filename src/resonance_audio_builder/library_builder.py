@@ -1882,12 +1882,14 @@ class App:
             elif sel == '4':
                 console.print("\n[magenta]Goodbye![/magenta]")
                 break
+def main() -> None:
+    """
+    CLI entry point.
+    """
+    app = App()
+    app.run()
 
 
-if __name__ == '__main__':
-    try:
-        App().run()
-    except KeyboardInterrupt:
-        print("\n\n[!] Interrupted. Progress saved.")
-        sys.exit(0)
+if __name__ == "__main__":
+    main()
 

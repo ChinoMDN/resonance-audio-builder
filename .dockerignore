@@ -20,10 +20,10 @@ build/
 .idea
 tests/
 docs/
-Downloads_HQ/
-Downloads_Mobile/
-canciones_fallidas.csv
-canciones_fallidas.txt
+Audio_HQ/
+Audio_Mobile/
+Failed_songs.csv
+Failed_songs.txt
 cookies.txt
 progreso.json
 youtube_cache.json

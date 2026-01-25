@@ -11,19 +11,19 @@ Build and manage a personal audio library using publicly accessible media source
 
 ## Table of Contents
 
-* [Why Resonance?](#why-resonance)
-* [Features](#features)
-* [Quick Start](#quick-start)
-* [Configuration](#configuration)
-* [Audio Normalization](#audio-normalization-ebu-r128)
-* [Lyrics](#lyrics)
-* [Advanced Usage](#advanced-usage)
-* [Keyboard Controls](#keyboard-controls)
-* [Troubleshooting](#troubleshooting)
-* [FAQ](#faq)
-* [Contributing](#contributing)
-* [License](#license)
-* [Legal Notice](#legal-notice)
+- [Why Resonance?](#why-resonance)
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Audio Normalization](#audio-normalization-ebu-r128)
+- [Lyrics](#lyrics)
+- [Advanced Usage](#advanced-usage)
+- [Keyboard Controls](#keyboard-controls)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
+- [Contributing](#contributing)
+- [License](#license)
+- [Legal Notice](#legal-notice)
 
 ---
 
@@ -31,17 +31,17 @@ Build and manage a personal audio library using publicly accessible media source
 
 Many personal audio collections suffer from:
 
-* Inconsistent loudness levels across tracks
-* Incomplete or inaccurate metadata
-* Lack of embedded lyrics
-* Poor or inconsistent transcoding quality
+- Inconsistent loudness levels across tracks
+- Incomplete or inaccurate metadata
+- Lack of embedded lyrics
+- Poor or inconsistent transcoding quality
 
 Resonance focuses on **library quality and consistency**, providing:
 
-* Professional-grade EBU R128 loudness normalization
-* Automatic metadata enrichment from external sources
-* Embedded synchronized lyrics support
-* A high-quality FFmpeg-based audio processing pipeline
+- Professional-grade EBU R128 loudness normalization
+- Automatic metadata enrichment from external sources
+- Embedded synchronized lyrics support
+- A high-quality FFmpeg-based audio processing pipeline
 
 ---
 
@@ -65,9 +65,9 @@ Resonance focuses on **library quality and consistency**, providing:
 
 ### Prerequisites
 
-* **Python 3.10+**
-* **FFmpeg** – Download from [https://ffmpeg.org](https://ffmpeg.org) and add to PATH
-* **Deno** (optional) – Used for auxiliary request handling
+- **Python 3.10+**
+- **FFmpeg** – Download from [https://ffmpeg.org](https://ffmpeg.org) and add to PATH
+- **Deno** - Optional Deno-based request handling for session-based access
 
 ### Installation
 
@@ -88,7 +88,7 @@ Run `build_exe.bat` to generate a standalone executable in the `dist/` directory
 3. Run:
 
 ```bash
-python src/library_builder.py
+python -m resonance_audio_builder
 ```
 
 4. Follow the interactive menu:
@@ -123,20 +123,20 @@ Edit `config.json` to customize behavior:
 
 ### Configuration Options
 
-| Option                   | Default            | Description                             |
-| ------------------------ | ------------------ | --------------------------------------- |
+| Option                   | Default        | Description                             |
+| ------------------------ | -------------- | --------------------------------------- |
 | `output_folder_hq`       | `Audio_HQ`     | Folder for high-quality output          |
 | `output_folder_mobile`   | `Audio_Mobile` | Folder for low-bitrate output           |
-| `quality_hq_bitrate`     | `320`              | Bitrate for HQ profile                  |
-| `quality_mobile_bitrate` | `96`               | Bitrate for mobile profile              |
-| `max_workers`            | `3`                | Concurrent processing threads           |
-| `normalize_audio`        | `true`             | Enable EBU R128 normalization           |
-| `embed_lyrics`           | `true`             | Retrieve and embed lyrics               |
-| `output_format`          | `mp3`              | Output format: `mp3`, `flac`, or `copy` |
-| `rate_limit_delay_min`   | `0.5`              | Minimum delay between requests          |
-| `rate_limit_delay_max`   | `2.0`              | Maximum delay between requests          |
-| `generate_m3u`           | `true`             | Generate playlist file                  |
-| `save_history`           | `true`             | Save session history                    |
+| `quality_hq_bitrate`     | `320`          | Bitrate for HQ profile                  |
+| `quality_mobile_bitrate` | `96`           | Bitrate for mobile profile              |
+| `max_workers`            | `3`            | Concurrent processing threads           |
+| `normalize_audio`        | `true`         | Enable EBU R128 normalization           |
+| `embed_lyrics`           | `true`         | Retrieve and embed lyrics               |
+| `output_format`          | `mp3`          | Output format: `mp3`, `flac`, or `copy` |
+| `rate_limit_delay_min`   | `0.5`          | Minimum delay between requests          |
+| `rate_limit_delay_max`   | `2.0`          | Maximum delay between requests          |
+| `generate_m3u`           | `true`         | Generate playlist file                  |
+| `save_history`           | `true`         | Save session history                    |
 
 ---
 
@@ -148,9 +148,9 @@ When enabled, FFmpeg applies:
 loudnorm=I=-14:TP=-1.5:LRA=11
 ```
 
-* **I=-14**: Target integrated loudness (LUFS)
-* **TP=-1.5**: True peak ceiling
-* **LRA=11**: Controlled loudness range
+- **I=-14**: Target integrated loudness (LUFS)
+- **TP=-1.5**: True peak ceiling
+- **LRA=11**: Controlled loudness range
 
 This ensures consistent perceived volume across the entire library.
 
@@ -160,8 +160,8 @@ This ensures consistent perceived volume across the entire library.
 
 Lyrics are retrieved from:
 
-* **LRCLIB** – Synchronized `.lrc` lyrics
-* **lyrics.ovh** – Plain text fallback
+- **LRCLIB** – Synchronized `.lrc` lyrics
+- **lyrics.ovh** – Plain text fallback
 
 Lyrics are embedded using standard ID3 tags and are compatible with most players.
 
@@ -196,14 +196,20 @@ Use a dedicated browser profile/account when exporting cookies to reduce risk.
 ```
 resonance-audio-builder/
 ├── src/
-│   └── library_builder.py
+│   └── resonance_audio_builder/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── cli.py
+│       └── library_builder.py
+├── tests/
+│   ├── conftest.py
+│   └── test_library_builder.py
 ├── config.json
 ├── requirements.txt
 ├── setup.py
 ├── build_exe.bat
-├── tests/
+├── Dockerfile
 ├── .github/workflows/
-├── dist/
 └── README.md
 ```
 
@@ -248,11 +254,11 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Acknowledgments
 
-* yt-dlp
-* FFmpeg
-* Mutagen
-* Rich
-* LRCLIB
+- yt-dlp
+- FFmpeg
+- Mutagen
+- Rich
+- LRCLIB
 
 ---
 
@@ -260,11 +266,9 @@ This project is licensed under the [MIT License](LICENSE).
 
 This software is intended for **personal, educational, and research purposes**.
 
-* Users are responsible for ensuring they have the right to access and process any media handled by this tool
-* The author does not host, distribute, or provide media content
-* No affiliation with Spotify, YouTube, Google, or any other platform is claimed
-* This software does not circumvent DRM, paywalls, or access restricted content
-* This software does not bypass platform protections
-* Use responsibly and in accordance with applicable laws.
-
-
+- Users are responsible for ensuring they have the right to access and process any media handled by this tool
+- The author does not host, distribute, or provide media content
+- No affiliation with Spotify, YouTube, Google, or any other platform is claimed
+- This software does not circumvent DRM, paywalls, or access restricted content
+- This software does not bypass platform protections
+- Use responsibly and in accordance with applicable laws.

@@ -34,4 +34,4 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Default command
-ENTRYPOINT ["python", "src/bypass_spotify.py"]
+ENTRYPOINT ["python", "-m", "resonance_audio_builder"]
