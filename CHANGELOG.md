@@ -7,31 +7,59 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [6.0.0] – 2026-01-24
+
+### Added
+
+- Modern Python packaging with `pyproject.toml` (PEP 517/518)
+- Proper package structure (`src/resonance_audio_builder/`)
+- Module entry point (`python -m resonance_audio_builder`)
+- CLI entry point (`resonance-audio-builder` command)
+- Rich terminal UI with live progress tracking
+- Code formatting with Black and isort
+- Type hints and mypy configuration
+- Comprehensive test suite (27 tests)
+
+### Changed
+
+- Migrated from `setup.py` to `pyproject.toml`
+- Restructured source code into proper Python package
+- Updated CI/CD pipeline with multi-platform testing
+- Improved code formatting and style consistency
+- Updated Docker configuration for new package structure
+
+### Removed
+
+- Legacy `setup.py` (replaced by `pyproject.toml`)
+- Old flat file structure
+
+---
+
 ## [5.0.0] – 2024-01-24
 
 ### Added
 
-* External configuration file (`config.json`)
-* Adaptive rate limiting for network stability
-* Visual ASCII-based progress indicators
-* File integrity verification using MD5 hashes
-* Automatic M3U playlist generation
-* Persistent session history tracking
-* Optional Deno-based request handling for restricted content
-* Embedded synchronized and plain lyrics support
+- External configuration file (`config.json`)
+- Adaptive rate limiting for network stability
+- Visual ASCII-based progress indicators
+- File integrity verification using MD5 hashes
+- Automatic M3U playlist generation
+- Persistent session history tracking
+- Optional Deno-based request handling for restricted content
+- Embedded synchronized and plain lyrics support
 
 ### Changed
 
-* Complete UI redesign using structured ASCII layouts
-* Refactored error handling with typed exceptions
-* Improved CSV encoding auto-detection and normalization
-* Internal storage migration from JSON to SQLite
-* Modularization of audio processing pipeline
+- Complete UI redesign using structured ASCII layouts
+- Refactored error handling with typed exceptions
+- Improved CSV encoding auto-detection and normalization
+- Internal storage migration from JSON to SQLite
+- Modularization of audio processing pipeline
 
 ### Fixed
 
-* Edge cases in interrupted download recovery
-* Metadata mismatches caused by inconsistent CSV headers
+- Edge cases in interrupted download recovery
+- Metadata mismatches caused by inconsistent CSV headers
 
 ---
 
@@ -39,18 +67,18 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Added
 
-* Real-time keyboard controls:
+- Real-time keyboard controls:
+    - `P` – Pause / Resume
+    - `S` – Skip current item
+    - `Q` – Graceful shutdown
 
-  * `P` – Pause / Resume
-  * `S` – Skip current item
-  * `Q` – Graceful shutdown
-* Menu option to retry failed items
-* ETA calculation based on rolling averages
+- Menu option to retry failed items
+- ETA calculation based on rolling averages
 
 ### Changed
 
-* Replaced emoji-based UI elements with ASCII for cross-platform compatibility
-* Improved progress reporting under multi-threaded workloads
+- Replaced emoji-based UI elements with ASCII for cross-platform compatibility
+- Improved progress reporting under multi-threaded workloads
 
 ---
 
@@ -58,14 +86,14 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Added
 
-* Interactive main menu system
-* Cache and progress cleanup options
-* System status and diagnostics panel
+- Interactive main menu system
+- Cache and progress cleanup options
+- System status and diagnostics panel
 
 ### Fixed
 
-* Validation of `cookies.txt` before authenticated requests
-* Incorrect resume behavior after forced termination
+- Validation of `cookies.txt` before authenticated requests
+- Incorrect resume behavior after forced termination
 
 ---
 
@@ -73,22 +101,22 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Added
 
-* Quality selection modes:
+- Quality selection modes:
+    - High Quality only
+    - Mobile Quality only
+    - Dual output
 
-  * High Quality only
-  * Mobile Quality only
-  * Dual output
-* Automatic CSV file discovery in project directory
-* Robust CSV encoding detection:
+- Automatic CSV file discovery in project directory
+- Robust CSV encoding detection:
+    - UTF-8 (with and without BOM)
+    - Latin-1
+    - CP1252
 
-  * UTF-8 (with and without BOM)
-  * Latin-1
-  * CP1252
-* CSV header normalization for improved compatibility
+- CSV header normalization for improved compatibility
 
 ### Changed
 
-* Improved handling of malformed or partial CSV exports
+- Improved handling of malformed or partial CSV exports
 
 ---
 
@@ -96,16 +124,16 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Added
 
-* Multi-threaded download and processing pipeline
-* Search result caching with TTL
-* Atomic checkpoint persistence
-* Cover art embedding
-* ID3 metadata tagging support
+- Multi-threaded download and processing pipeline
+- Search result caching with TTL
+- Atomic checkpoint persistence
+- Cover art embedding
+- ID3 metadata tagging support
 
 ### Changed
 
-* Migration to a cleaner, layered architecture
-* Introduction of typed domain-specific exceptions
+- Migration to a cleaner, layered architecture
+- Introduction of typed domain-specific exceptions
 
 ---
 
@@ -113,6 +141,6 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ### Added
 
-* Proof-of-concept audio retrieval
-* Basic metadata tagging
-* Single-threaded processing pipeline
+- Proof-of-concept audio retrieval
+- Basic metadata tagging
+- Single-threaded processing pipeline

@@ -74,7 +74,13 @@ Resonance focuses on **library quality and consistency**, providing:
 ```bash
 git clone https://github.com/ChinoMDN/resonance-audio-builder.git
 cd resonance-audio-builder
-pip install -r requirements.txt
+pip install -e .
+```
+
+Or install with development dependencies:
+
+```bash
+pip install -e ".[dev]"
 ```
 
 ### Build Executable (Windows)
@@ -204,9 +210,9 @@ resonance-audio-builder/
 ├── tests/
 │   ├── conftest.py
 │   └── test_library_builder.py
+├── pyproject.toml
 ├── config.json
 ├── requirements.txt
-├── setup.py
 ├── build_exe.bat
 ├── Dockerfile
 ├── .github/workflows/

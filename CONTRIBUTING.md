@@ -71,13 +71,29 @@ Small, focused PRs are preferred over large, multi-purpose ones.
 
 ## Code Style Guidelines
 
-Please follow these conventions:
+This project uses automated formatting tools:
 
-- Use **4 spaces** for indentation
+- **Black** – Code formatting (line length: 120)
+- **isort** – Import sorting (profile: black)
+- **flake8** – Linting
+- **mypy** – Type checking (optional)
+
+### Before committing:
+
+```bash
+# Format code
+black src/ tests/ --line-length 120
+isort src/ tests/ --profile black --line-length 120
+
+# Run tests
+pytest tests/ -v
+```
+
+### General guidelines:
+
 - Follow **PEP 8** style guidelines
 - Add docstrings to public functions and classes
 - Keep functions small and focused
-- Prefer explicit code over clever shortcuts
 - Use type hints where reasonable
 - Avoid introducing unnecessary dependencies
 
@@ -115,7 +131,15 @@ feat: add retry logic for failed downloads
 
 ## Testing Requirements
 
-Before submitting a PR, ensure the following:
+Before submitting a PR:
+
+### Run the test suite:
+
+```bash
+pytest tests/ -v
+```
+
+### Manual testing:
 
 1. Run the application with a small CSV dataset
 2. Test all relevant menu options
