@@ -169,80 +169,90 @@ class AudioDownloader:
                 return DownloadResult(True, 0, skipped=True)
 
             self.log.info(f"Downloading: {track.title}")
-
             if not search_result:
                 raise YouTubeError("No search result provided")
 
             # 2. Download RAW (Async)
             raw_path = await self._download_raw(search_result.url, f"isrc_{track.isrc}")
-
-            if not raw_path or not raw_path.exists() or raw_path.stat().st_size < 1024:
-                raise YouTubeError("Download failed or file corrupted")
+            self._validate_raw(raw_path)
 
             if check_quit and check_quit():
                 return DownloadResult(False, 0, "Cancelled", skipped=True)
 
-            # 3. Spectral Analysis
-            fake_hq = False
-            if self.cfg.SPECTRAL_ANALYSIS and self.analyzer and needed_hq:
-                # TODO: Make analyzer async, but for now wrap it
-                is_legit = self.analyzer.analyze_integrity(raw_path, self.cfg.SPECTRAL_CUTOFF)
-                if not is_legit:
-                    self.log.warning(f"Fake HQ: {track.title}")
-                    fake_hq = True
+            # 3. Spectral Analysis & Assets
+            fake_hq = self._check_fake_hq(raw_path, track, todo_hq)
+            await self._fetch_metadata_assets(track)
 
-            # 4. Metadata & Cover (Async)
-            if track.cover_url:
-                track.cover_data = await self._download_cover(track.cover_url)
-                if track.cover_data:
-                    track.cover_data = await self._resize_cover(track.cover_data)
-
-            success = True
-            total_bytes = 0
-
-            # 5. Transcode (Parallel if possible, but ffmpeg might saturate CPU)
-            # We can run HQ and Mobile in parallel if IO bound, usually CPU bound.
-            # But let's use gather for coolness and testing async
-            tasks = []
-            if todo_hq:
-                tasks.append(self._transcode(raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE))
-            if todo_mob:
-                tasks.append(self._transcode(raw_path, mobile_path, self.cfg.QUALITY_MOBILE_BITRATE))
-
-            results = await asyncio.gather(*tasks)
-
-            # Process results
-            idx = 0
-            if todo_hq:
-                if results[idx]:
-                    await self._inject_metadata(hq_path, track)
-                    total_bytes += hq_path.stat().st_size
-                else:
-                    success = False
-                idx += 1
-
-            if todo_mob:
-                if results[idx]:
-                    await self._inject_metadata(mobile_path, track)
-                    total_bytes += mobile_path.stat().st_size
-                else:
-                    success = False
+            # 4. Transcode and Inject
+            success, total_bytes = await self._perform_transcoding_pipeline(
+                raw_path, hq_path, mobile_path, track, todo_hq, todo_mob
+            )
 
             if success:
                 return DownloadResult(True, total_bytes, fake_hq=fake_hq)
-            else:
-                return DownloadResult(False, 0, "Transcode failed")
+            return DownloadResult(False, 0, "Transcode failed")
 
         except Exception as e:
             self.log.error(f"Download error {track.title}: {e}")
             return DownloadResult(False, 0, f"Error: {str(e)}")
-
         finally:
-            if raw_path and raw_path.exists():
-                try:
-                    os.remove(raw_path)
-                except Exception:
-                    pass
+            self._cleanup_temp_raw(raw_path)
+
+    def _validate_raw(self, path: Optional[Path]):
+        if not path or not path.exists() or path.stat().st_size < 1024:
+            raise YouTubeError("Download failed or file corrupted")
+
+    def _check_fake_hq(self, raw_path: Path, track: TrackMetadata, needed_hq: bool) -> bool:
+        if self.cfg.SPECTRAL_ANALYSIS and self.analyzer and needed_hq:
+            if not self.analyzer.analyze_integrity(raw_path, self.cfg.SPECTRAL_CUTOFF):
+                self.log.warning(f"Fake HQ: {track.title}")
+                return True
+        return False
+
+    async def _fetch_metadata_assets(self, track: TrackMetadata):
+        if track.cover_url:
+            track.cover_data = await self._download_cover(track.cover_url)
+            if track.cover_data:
+                track.cover_data = await self._resize_cover(track.cover_data)
+
+    async def _perform_transcoding_pipeline(
+        self, raw_path, hq_path, mobile_path, track, todo_hq, todo_mob
+    ) -> Tuple[bool, int]:
+        tasks = []
+        if todo_hq:
+            tasks.append(self._transcode(raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE))
+        if todo_mob:
+            tasks.append(self._transcode(raw_path, mobile_path, self.cfg.QUALITY_MOBILE_BITRATE))
+
+        results = await asyncio.gather(*tasks)
+
+        success = True
+        total_bytes = 0
+        idx = 0
+
+        if todo_hq:
+            if results[idx]:
+                await self._inject_metadata(hq_path, track)
+                total_bytes += hq_path.stat().st_size
+            else:
+                success = False
+            idx += 1
+
+        if todo_mob:
+            if results[idx]:
+                await self._inject_metadata(mobile_path, track)
+                total_bytes += mobile_path.stat().st_size
+            else:
+                success = False
+
+        return success, total_bytes
+
+    def _cleanup_temp_raw(self, raw_path: Optional[Path]):
+        if raw_path and raw_path.exists():
+            try:
+                os.remove(raw_path)
+            except Exception:
+                pass
 
     async def _download_cover(self, url: str) -> Optional[bytes]:
         if not url:
@@ -268,49 +278,54 @@ class AudioDownloader:
     def _inject_metadata_sync(self, file_path: Path, track: TrackMetadata):
         """Synchronous part of metadata injection"""
         try:
-            try:
-                audio = MP3(str(file_path), ID3=ID3)
-            except Exception:
-                audio = MP3(str(file_path))
-            try:
-                audio.delete()
-            except Exception:
-                pass
-
-            audio = MP3(str(file_path))
-            audio.add_tags()
-
-            if track.title:
-                audio.tags.add(TIT2(encoding=3, text=track.title))
-            if track.artist:
-                audio.tags.add(TPE1(encoding=3, text=track.artist))
-            if track.album:
-                audio.tags.add(TALB(encoding=3, text=track.album))
-
-            # Other tags
-            mapping = {
-                TPE2: track.album_artist,
-                TRCK: track.track_number,
-                TPOS: track.disc_number,
-                TSRC: track.isrc,
-            }
-            for tag_class, val in mapping.items():
-                if val:
-                    audio.tags.add(tag_class(encoding=3, text=str(val)))
-
-            if track.release_date and len(track.release_date) >= 4:
-                audio.tags.add(TYER(encoding=3, text=track.release_date[:4]))
-
-            if track.spotify_uri:
-                audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {track.spotify_uri}"))
-
-            if track.cover_data:
-                audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=track.cover_data))
-
+            audio = self._recreate_mp3_tags(file_path)
+            self._apply_basic_tags(audio, track)
+            self._apply_extended_tags(audio, track)
             audio.save(v2_version=3)
             self.log.debug(f"Metadatos inyectados: {track.title}")
         except Exception as e:
             self.log.debug(f"Metadata error: {e}")
+
+    def _recreate_mp3_tags(self, file_path: Path) -> MP3:
+        try:
+            audio = MP3(str(file_path), ID3=ID3)
+        except Exception:
+            audio = MP3(str(file_path))
+        try:
+            audio.delete()
+        except Exception:
+            pass
+        audio = MP3(str(file_path))
+        audio.add_tags()
+        return audio
+
+    def _apply_basic_tags(self, audio: MP3, track: TrackMetadata):
+        if track.title:
+            audio.tags.add(TIT2(encoding=3, text=track.title))
+        if track.artist:
+            audio.tags.add(TPE1(encoding=3, text=track.artist))
+        if track.album:
+            audio.tags.add(TALB(encoding=3, text=track.album))
+
+    def _apply_extended_tags(self, audio: MP3, track: TrackMetadata):
+        mapping = {
+            TPE2: track.album_artist,
+            TRCK: track.track_number,
+            TPOS: track.disc_number,
+            TSRC: track.isrc,
+        }
+        for tag_class, val in mapping.items():
+            if val:
+                audio.tags.add(tag_class(encoding=3, text=str(val)))
+
+        if track.release_date and len(track.release_date) >= 4:
+            audio.tags.add(TYER(encoding=3, text=track.release_date[:4]))
+
+        if track.spotify_uri:
+            audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {track.spotify_uri}"))
+
+        if track.cover_data:
+            audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=track.cover_data))
 
     def _get_ytdlp_options(self, out_tmpl: Path, proxy: Optional[str]) -> dict:
         """Configura el diccionario de opciones para yt-dlp"""
@@ -351,14 +366,24 @@ class AudioDownloader:
 
     async def _download_raw(self, url: str, name: str) -> Path:
         """Async wrapper around yt-dlp download"""
-        # 1. Setup paths and options
         temp_dir = Path(tempfile.gettempdir())
         out_tmpl = temp_dir / f"ytraw_{name}_{int(time.time())}.%(ext)s"
 
         proxy = await self.proxy_manager.get_proxy_async() if self.proxy_manager else None
         opts = self._get_ytdlp_options(out_tmpl, proxy)
+        opts["logger"] = self._setup_ytdlp_logger()
 
-        # 2. Force logging to file
+        loop = asyncio.get_running_loop()
+        try:
+            return await loop.run_in_executor(None, self._execute_ydl, url, opts, temp_dir)
+        except yt_dlp.utils.DownloadError as e:
+            self._handle_ytdlp_error(e, proxy)
+        except Exception as e:
+            if self.proxy_manager and proxy:
+                self.proxy_manager.mark_failure(proxy)
+            raise YouTubeError(f"Error inesperado en yt-dlp: {e}")
+
+    def _setup_ytdlp_logger(self):
         class FileLogger:
             def _log(self, prefix, msg):
                 with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
@@ -373,57 +398,50 @@ class AudioDownloader:
             def error(self, msg):
                 self._log("ERROR", msg)
 
-        opts["logger"] = FileLogger()
+        return FileLogger()
 
-        loop = asyncio.get_running_loop()
+    def _execute_ydl(self, url, opts, temp_dir) -> Path:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if not info:
+                raise NotFoundError("yt-dlp no retornó información")
 
-        def _run_ydl():
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                if not info:
-                    raise NotFoundError("yt-dlp no retornó información")
+            final_path = Path(ydl.prepare_filename(info))
+            if not final_path.exists():
+                recovered = self._attempt_recovery(temp_dir, final_path)
+                if recovered:
+                    return recovered
+            return final_path
 
-                final_path = Path(ydl.prepare_filename(info))
-
-                if not final_path.exists():
-                    try:
-                        files = list(temp_dir.glob("*"))
-                        self.log.debug(f"MISSING: {final_path}")
-                        self.log.debug(f"FOUND in {temp_dir}: {[f.name for f in files]}")
-
-                        stem = final_path.stem
-                        for f in files:
-                            if f.stem == stem:
-                                self.log.debug(f"Recovered file with different ext: {f}")
-                                return f
-                    except Exception:
-                        pass
-
-                return final_path
-
+    def _attempt_recovery(self, temp_dir: Path, final_path: Path) -> Optional[Path]:
         try:
-            return await loop.run_in_executor(None, _run_ydl)
-        except yt_dlp.utils.DownloadError as e:
-            if self.proxy_manager and proxy:
-                self.proxy_manager.mark_failure(proxy)
+            files = list(temp_dir.glob("*"))
+            stem = final_path.stem
+            for f in files:
+                if f.stem == stem:
+                    return f
+        except Exception:
+            pass
+        return None
 
-            err_str = str(e).lower()
-            if "429" in err_str or "too many requests" in err_str:
-                self.log.warning("YouTube Rate Limit detected (HTTP 429). Pausing for 60s...")
-                time.sleep(60)  # Blocking sleep, but inside executor, so main loop is fine
-                raise RecoverableError("Rate Limit (429) - Retrying after pause")
-            if "copyright" in err_str or "blocked" in err_str:
-                raise CopyrightError(f"Bloqueado: {str(e)[:50]}")
-            elif "not available" in err_str or "geo" in err_str:
-                raise GeoBlockError("No disponible en tu región")
-            elif "sign in" in err_str or "age" in err_str:
-                raise FatalError(f"Requiere login: {str(e)[:50]}")
-            else:
-                raise YouTubeError(f"Error descarga: {str(e)}")
-        except Exception as e:
-            if self.proxy_manager and proxy:
-                self.proxy_manager.mark_failure(proxy)
-            raise YouTubeError(f"Error inesperado en yt-dlp: {e}")
+    def _handle_ytdlp_error(self, e: Exception, proxy: Optional[str]):
+        if self.proxy_manager and proxy:
+            self.proxy_manager.mark_failure(proxy)
+
+        err_str = str(e).lower()
+        if "429" in err_str or "too many requests" in err_str:
+            self.log.warning("YouTube Rate Limit detected (HTTP 429). Pausing for 60s...")
+            time.sleep(60)
+            raise RecoverableError("Rate Limit (429) - Retrying after pause")
+
+        if "copyright" in err_str or "blocked" in err_str:
+            raise CopyrightError(f"Bloqueado: {str(e)[:50]}")
+        elif "not available" in err_str or "geo" in err_str:
+            raise GeoBlockError("No disponible en tu región")
+        elif "sign in" in err_str or "age" in err_str:
+            raise FatalError(f"Requiere login: {str(e)[:50]}")
+        else:
+            raise YouTubeError(f"Error descarga: {str(e)}")
 
     def _build_ffmpeg_cmd(self, input_path: Path, output_path: Path, bitrate: str) -> list:
         """Construye el comando ffmpeg modularmente"""

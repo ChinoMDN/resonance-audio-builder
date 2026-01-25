@@ -3,6 +3,7 @@ import csv
 import glob
 import os
 import shutil
+import tempfile
 import traceback
 from pathlib import Path
 from typing import List, Optional
@@ -282,31 +283,37 @@ class App:
     def _perform_clear(self, sel: str) -> List[str]:
         """Ejecuta la limpieza solicitada"""
         deleted = []
-        # Cache
         if sel in ["1", "3"]:
-            if self.cache:
-                self.cache.clear()
+            self._clear_cache_data()
             deleted.append("Cache (SQLite)")
-            for f in ["cache.db", self.cfg.CACHE_FILE]:
-                if os.path.exists(f):
-                    try:
-                        os.remove(f)
-                    except Exception:
-                        pass
-        # Progress
+
         if sel in ["2", "3"]:
             self.db.clear()
             deleted.append("Progress (DB)")
-        # Extra (sel 3 only)
+
         if sel == "3":
-            for f in [self.cfg.HISTORY_FILE, self.cfg.M3U_FILE]:
-                if os.path.exists(f):
-                    try:
-                        os.remove(f)
-                        deleted.append(Path(f).name)
-                    except Exception:
-                        pass
+            self._clear_temp_files()
+            deleted.append("Temp Files")
+
         return deleted
+
+    def _clear_cache_data(self):
+        if self.cache:
+            self.cache.clear()
+        for f in ["cache.db", self.cfg.CACHE_FILE]:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+
+    def _clear_temp_files(self):
+        temp_dir = Path(tempfile.gettempdir())
+        for f in temp_dir.glob("ytraw_*"):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
 
     def _clear_cache(self):
         """Menú de limpieza modular"""

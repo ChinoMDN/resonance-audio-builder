@@ -65,32 +65,34 @@ class MetadataWriter:
             return
 
         try:
-            # 1. Cargar audio
-            try:
-                audio = MP3(str(path), ID3=ID3)
-            except Exception:
-                audio = MP3(str(path))
-
+            audio = self._load_audio(path)
             if audio.tags is None:
                 audio.add_tags()
 
-            # 2. Aplicar componentes
             self.log.debug(f"Writing metadata for {meta.title}...")
             self._add_text_tags(audio, meta)
             self._add_cover(audio, meta)
             self._add_lyrics(audio, meta)
 
-            # 3. Guardar con reintentos
-            max_retries = 3
-            for i in range(max_retries):
-                try:
-                    audio.save(v2_version=3)
-                    break
-                except Exception as save_err:
-                    if i == max_retries - 1:
-                        raise save_err
-                    time.sleep(0.5)
+            self._save_audio(audio, meta)
 
         except Exception as e:
             self.log.error(f"FATAL METADATA ERROR: {e}")
             print(f"\n[!] Error saving tags for {meta.title}: {e}")
+
+    def _load_audio(self, path: Path) -> MP3:
+        try:
+            return MP3(str(path), ID3=ID3)
+        except Exception:
+            return MP3(str(path))
+
+    def _save_audio(self, audio: MP3, meta: TrackMetadata):
+        max_retries = 3
+        for i in range(max_retries):
+            try:
+                audio.save(v2_version=3)
+                break
+            except Exception as save_err:
+                if i == max_retries - 1:
+                    raise save_err
+                time.sleep(0.5)
