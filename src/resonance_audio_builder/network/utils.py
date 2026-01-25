@@ -7,6 +7,7 @@ USER_AGENTS = [
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36",
 ]
 
+
 def validate_cookies_file(filepath: str) -> bool:
     """Valida que el archivo de cookies tenga formato Netscape"""
     path = Path(filepath)

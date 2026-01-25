@@ -1,25 +1,26 @@
+import asyncio
+import csv
 import glob
 import os
 import shutil
-import csv
-import asyncio
 import traceback
-from typing import Optional, List
 from pathlib import Path
+from typing import List, Optional
 
 from rich.panel import Panel
-from rich.table import Table
 from rich.prompt import Prompt
+from rich.table import Table
 
+from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
-from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import print_header, clear_screen, console
 from resonance_audio_builder.core.manager import DownloadManager
+from resonance_audio_builder.core.state import ProgressDB
+from resonance_audio_builder.core.ui import clear_screen, console, print_header
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.limiter import RateLimiter
 from resonance_audio_builder.network.utils import validate_cookies_file
-from resonance_audio_builder.audio.metadata import TrackMetadata
+
 
 class App:
     def __init__(self):
@@ -52,7 +53,7 @@ class App:
 
         # Stats
         cache_count = self.cache.count() if self.cache else 0
-        
+
         # Get stats from DB
         stats = self.db.get_stats()
         progress_count = stats.get("ok", 0) + stats.get("skip", 0) + stats.get("error", 0)
@@ -87,7 +88,7 @@ class App:
         # Ensure input folder exists
         inp_dir = Path(self.cfg.INPUT_FOLDER)
         inp_dir.mkdir(exist_ok=True)
-        
+
         # Glob uses OS separators logic? glob.glob accepts paths.
         pattern = str(inp_dir / "*.csv")
         csvs = [c for c in glob.glob(pattern) if "fallidas" not in c.lower()]
@@ -117,17 +118,17 @@ class App:
         for i, f in enumerate(csvs):
             size_mb = os.path.getsize(f) / 1024
             table.add_row(str(i + 1), f, f"{size_mb:.1f} KB")
-        
+
         table.add_row("A", "[bold green]ALL FILES[/bold green]", "")
 
         console.print(table)
 
         choices = [str(i + 1) for i in range(len(csvs))] + ["A"]
         sel = Prompt.ask("Choose a file (or 'A' for All)", choices=choices, default="1")
-        
+
         if sel.upper() == "A":
             return csvs
-            
+
         return [csvs[int(sel) - 1]]
 
     def _select_quality(self):
@@ -193,16 +194,16 @@ class App:
 
         if ask_quality:
             self._select_quality()
-        
+
         all_tracks = []
         for csv_file in csv_files:
             print(f"\n[i] Reading {csv_file}...")
             rows = self._read_csv(csv_file)
-            
+
             # Determine playlist name for subfolder
             # csv_file is a path string, we want filename without extension
             playlist_name = Path(csv_file).stem
-            
+
             if rows:
                 tracks = []
                 for row in rows:
@@ -211,7 +212,7 @@ class App:
                     # We use setattr to attach it to the instance
                     setattr(t, "playlist_subfolder", playlist_name)
                     tracks.append(t)
-                    
+
                 all_tracks.extend(tracks)
 
         if not all_tracks:
@@ -238,7 +239,7 @@ class App:
             with open("crash.log", "w", encoding="utf-8") as f:
                 f.write(traceback.format_exc())
             console.print(f"\n[bold red][!] Error crítico guardado en crash.log[/bold red]")
-        
+
         console.input("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
 
     def _retry_failed(self):
@@ -301,20 +302,20 @@ class App:
             return
 
         deleted = []
-        
+
         # Clear Search Cache (SQLite + JSON legacy)
         if sel in ["1", "3"]:
             if self.cache:
                 self.cache.clear()
             deleted.append("Cache (SQLite)")
-            
+
             # Also delete cache.db file
             if os.path.exists("cache.db"):
                 try:
                     os.remove("cache.db")
                 except:
                     pass
-                    
+
             # Legacy JSON cache
             if os.path.exists(self.cfg.CACHE_FILE):
                 try:
@@ -336,7 +337,7 @@ class App:
                     deleted.append("History")
                 except:
                     pass
-            
+
             # M3U playlist
             if os.path.exists(self.cfg.M3U_FILE):
                 try:
@@ -367,33 +368,34 @@ class App:
     def watch_mode(self, folder: str):
         """Inicia el modo Watchdog"""
         from resonance_audio_builder.watch.observer import start_observer
-        
+
         if not os.path.exists(folder):
             print(f"[!] Folder not found: {folder}")
             return
-            
+
         clear_screen()
         print_header()
-        
+
         # Preguntar calidad UNA sola vez al inicio
         self._select_quality()
-        
+
         console.print(f"[green]Quality set to: {self.cfg.MODE}. Monitoring for new CSVs...[/green]")
-        
+
         start_observer(folder, self)
 
     def run(self):
         # Chequear argumentos CLI manualmente (simple)
         import sys
+
         if len(sys.argv) > 1:
             if sys.argv[1] == "--watch":
                 # Default to INPUT_FOLDER (Playlists) if no arg provided
                 default_watch = self.cfg.INPUT_FOLDER
                 folder = sys.argv[2] if len(sys.argv) > 2 else default_watch
-                
+
                 # Ensure it exists
                 Path(folder).mkdir(exist_ok=True)
-                
+
                 self.watch_mode(folder)
                 return
 
@@ -419,7 +421,7 @@ class App:
             sel = Prompt.ask("Option", choices=["1", "2", "3", "4"])
 
             if sel == "1":
-                self._start_download() # Interactivo
+                self._start_download()  # Interactivo
                 console.input("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
                 self._notify_end()
             elif sel == "2":

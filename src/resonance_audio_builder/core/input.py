@@ -1,8 +1,10 @@
+import atexit
 import os
 import threading
 import time
-import atexit
+
 from resonance_audio_builder.core.logger import Logger
+
 
 class KeyboardController:
     """Controlador de teclado para comandos en tiempo real"""
@@ -64,6 +66,7 @@ class KeyboardController:
         except Exception as e:
             self.log.error(f"Keyboard listener error: {e}")
             import traceback
+
             self.log.error(traceback.format_exc())
 
     def _listen_unix(self):

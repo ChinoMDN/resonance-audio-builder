@@ -1,19 +1,21 @@
 import hashlib
 import json
 import os
-from typing import List, Tuple
 from pathlib import Path
+from typing import List, Tuple
 
-def calculate_md5(filepath: Path) -> str:
+
+def calculate_md5(file_path: Path) -> str:
     """Calcula hash MD5 de un archivo"""
-    hash_md5 = hashlib.md5()
+    hash_md5 = hashlib.md5()  # nosec B324
     try:
-        with open(filepath, "rb") as f:
+        with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
     except:
         return ""
+
 
 def export_m3u(tracks: List[Tuple[str, str, int]], filepath: str):
     """Exporta lista de canciones a formato M3U"""
@@ -25,6 +27,7 @@ def export_m3u(tracks: List[Tuple[str, str, int]], filepath: str):
                 f.write(f"{path}\n")
     except:
         pass
+
 
 def save_history(history_file: str, session_data: dict):
     """Guarda historial de sesion"""

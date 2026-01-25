@@ -1,5 +1,7 @@
-import requests
 from typing import Optional
+
+import requests
+
 
 def fetch_lyrics(artist: str, title: str, duration_sec: int = 0) -> Optional[str]:
     """

@@ -1,8 +1,10 @@
 import threading
 from datetime import datetime
+
 from rich.console import Console
 
 console = Console()
+
 
 class Logger:
     def __init__(self, debug: bool):

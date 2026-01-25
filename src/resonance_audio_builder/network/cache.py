@@ -2,6 +2,7 @@ import sqlite3
 import threading
 import time
 
+
 class CacheManager:
     def __init__(self, db_path: str):
         self.db_path = db_path

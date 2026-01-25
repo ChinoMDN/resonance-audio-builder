@@ -1,20 +1,21 @@
+import asyncio
+import json
 import os
 import random
 import time
-import asyncio
-import json
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 import yt_dlp
 
-from resonance_audio_builder.core.config import Config
-from resonance_audio_builder.core.logger import Logger
-from resonance_audio_builder.core.exceptions import NotFoundError, YouTubeError
-from resonance_audio_builder.network.cache import CacheManager
-from resonance_audio_builder.network.utils import USER_AGENTS, validate_cookies_file
-from resonance_audio_builder.network.proxies import SmartProxyManager
 from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.core.config import Config
+from resonance_audio_builder.core.exceptions import NotFoundError, YouTubeError
+from resonance_audio_builder.core.logger import Logger
+from resonance_audio_builder.network.cache import CacheManager
+from resonance_audio_builder.network.proxies import SmartProxyManager
+from resonance_audio_builder.network.utils import USER_AGENTS, validate_cookies_file
+
 
 @dataclass
 class SearchResult:
@@ -23,8 +24,11 @@ class SearchResult:
     duration: int
     cached: bool = False
 
+
 class YouTubeSearcher:
-    def __init__(self, config: Config, logger: Logger, cache_manager: CacheManager, proxy_manager: SmartProxyManager = None):
+    def __init__(
+        self, config: Config, logger: Logger, cache_manager: CacheManager, proxy_manager: SmartProxyManager = None
+    ):
         self.cfg = config
         self.log = logger
         self.app_cache = cache_manager
@@ -92,7 +96,7 @@ class YouTubeSearcher:
             "socket_timeout": self.cfg.SEARCH_TIMEOUT,
             "http_headers": {"User-Agent": random.choice(USER_AGENTS)},
         }
-        
+
         # Get proxy asynchronously
         if self.proxy_manager:
             proxy = await self.proxy_manager.get_proxy_async()
@@ -105,11 +109,11 @@ class YouTubeSearcher:
         try:
             # Run blocking yt-dlp in executor
             loop = asyncio.get_running_loop()
-            
+
             def _extract():
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     return ydl.extract_info(f"ytsearch5:{query}", download=False)
-            
+
             # Using default thread executor
             results = await loop.run_in_executor(None, _extract)
 
@@ -124,9 +128,7 @@ class YouTubeSearcher:
 
             if best_entry:
                 url = best_entry.get("webpage_url") or best_entry.get("url")
-                sr = SearchResult(
-                    url=url, title=best_entry.get("title", ""), duration=best_entry.get("duration", 0)
-                )
+                sr = SearchResult(url=url, title=best_entry.get("title", ""), duration=best_entry.get("duration", 0))
 
                 self.log.debug(f"Encontrado: {sr.title[:50]}")
 
@@ -144,7 +146,7 @@ class YouTubeSearcher:
             # Register proxy failure if applicable
             if self.proxy_manager and "proxy" in opts:
                 self.proxy_manager.mark_failure(opts["proxy"])
-            
+
             # Raise wrapped error? Or just return None allows retry?
             # For now return None to treat as 'not found' in this attempt
             pass
@@ -172,8 +174,8 @@ class YouTubeSearcher:
                     best_entry = entry
             elif not best_entry:
                 best_entry = entry
-        
+
         if not best_entry and entries:
             best_entry = entries[0]
-            
+
         return best_entry

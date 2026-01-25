@@ -1,30 +1,31 @@
-import os
 import asyncio
+import csv
+import os
 import queue
 import time
 import traceback
-import csv
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple
 
 from rich.panel import Panel
-from rich.table import Table
 from rich.prompt import Confirm
+from rich.table import Table
 
+from resonance_audio_builder.audio.downloader import AudioDownloader
+from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.audio.tagging import MetadataWriter
+from resonance_audio_builder.audio.youtube import YouTubeSearcher
 from resonance_audio_builder.core.config import Config, QualityMode
+from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
+from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import RichUI, print_header, clear_screen, format_time, format_size, console
-from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
-from resonance_audio_builder.core.utils import save_history, export_m3u
-from resonance_audio_builder.core.input import KeyboardController
-from resonance_audio_builder.audio.metadata import TrackMetadata
-from resonance_audio_builder.audio.youtube import YouTubeSearcher
-from resonance_audio_builder.audio.downloader import AudioDownloader
-from resonance_audio_builder.audio.tagging import MetadataWriter
+from resonance_audio_builder.core.ui import RichUI, clear_screen, console, format_size, format_time, print_header
+from resonance_audio_builder.core.utils import export_m3u, save_history
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager
+
 
 class DownloadManager:
     """Orquestador principal de descargas (Async)"""
@@ -33,14 +34,14 @@ class DownloadManager:
         self.cfg = config
         self.log = Logger(config.DEBUG_MODE)
         self.cache = cache_manager
-        
+
         self.state = ProgressDB(config)
         self.ui = RichUI(config)
         self.log.set_tracker(self.ui)
-        
+
         # Init Proxy Manager (Async compliant)
         self.proxy_manager = SmartProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
-        
+
         self.downloader = AudioDownloader(self.cfg, self.log, self.proxy_manager)
         self.searcher = YouTubeSearcher(self.cfg, self.log, self.cache, self.proxy_manager)
         self.metadata_writer = MetadataWriter(self.log)
@@ -75,7 +76,7 @@ class DownloadManager:
                 if done_count < 10:
                     table.add_row(t.title, t.artist, "[green]✔ Downloaded[/green]")
                 done_count += 1
-        
+
         if done_count > 10:
             table.add_row("...", "...", f"[dim]+ {done_count - 10} more done[/dim]")
 
@@ -84,9 +85,9 @@ class DownloadManager:
             if pending_count < 20:
                 table.add_row(t.title, t.artist, "[yellow]⏳ Pending[/yellow]")
             pending_count += 1
-            
+
         if pending_count > 20:
-             table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
+            table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
 
         console.print(Panel(table, border_style="blue"))
 
@@ -133,28 +134,31 @@ class DownloadManager:
             while not self.queue.empty():
                 if self.keyboard.should_quit():
                     break
-                
+
                 # Check if all workers died? No, they loop until cancelled or queue empty check inside
                 # Actually _worker pops from queue.
                 # We can just join the queue, but we need to check keyboard interrupt.
                 # So we poll queue empty + keyboard
                 await asyncio.sleep(0.5)
-            
+
             # Wait for remaining tasks in queue (if not quitting)
             if not self.keyboard.should_quit():
                 await self.queue.join()
 
         except asyncio.CancelledError:
-             pass
+            pass
         finally:
             # Setup for clean exit
             for w in workers:
                 w.cancel()
-            
+
             # Drain queue if quitting
             while not self.queue.empty():
-                try: self.queue.get_nowait(); self.queue.task_done()
-                except: break
+                try:
+                    self.queue.get_nowait()
+                    self.queue.task_done()
+                except:
+                    break
 
             self.keyboard.stop()
             self.ui.stop()
@@ -172,7 +176,7 @@ class DownloadManager:
             except asyncio.CancelledError:
                 self.log.debug("worker cancelled")
                 break
-            
+
             task_id = None
             try:
                 # Check Pause
@@ -194,8 +198,9 @@ class DownloadManager:
                 last_error = ""
 
                 while attempt < self.cfg.MAX_RETRIES and not success:
-                    if self.keyboard.should_quit(): break
-                    
+                    if self.keyboard.should_quit():
+                        break
+
                     # Create task strictly before starting attempt to show status
                     if not task_id:
                         task_id = self.ui.add_download_task(track.artist, track.title)
@@ -213,11 +218,13 @@ class DownloadManager:
                         self.ui.update_task_status(task_id, "[blue]Downloading...[/blue]")
                         subfolder = getattr(track, "playlist_subfolder", "")
 
-                        result = await self.downloader.download(search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder)
+                        result = await self.downloader.download(
+                            search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder
+                        )
                         # Download finished
 
                         if not result.success:
-                             raise RecoverableError(result.error or "Unknown download error")
+                            raise RecoverableError(result.error or "Unknown download error")
 
                         status_str = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
                         self.ui.update_task_status(task_id, status_str)
@@ -235,15 +242,15 @@ class DownloadManager:
                         last_error = str(e)
                         self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
                         if attempt < self.cfg.MAX_RETRIES:
-                             self.log.debug(f"Reintento {attempt}: {e}")
-                             await asyncio.sleep(2 * attempt)
+                            self.log.debug(f"Reintento {attempt}: {e}")
+                            await asyncio.sleep(2 * attempt)
 
                     except Exception as e:
                         last_error = str(e)
                         self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
                         self.log.debug(f"Error inesperado: {traceback.format_exc()}")
                         break
-                
+
                 if not success and not self.keyboard.should_quit():
                     self.ui.update_task_status(task_id, f"[red]Failed: {last_error}[/red]")
                     self.state.mark(track, "error", error=last_error)
@@ -258,26 +265,28 @@ class DownloadManager:
                 self.queue.task_done()
 
     def _save_failed(self):
-        if not self.failed_tracks: return
+        if not self.failed_tracks:
+            return
         try:
             with open(self.cfg.ERROR_FILE, "w", encoding="utf-8") as f:
                 f.write(f"CANCIONES FALLIDAS - {datetime.now()}\n\n")
                 for track, error in self.failed_tracks:
                     f.write(f"• {track.artist} - {track.title}\n  Error: {error}\n\n")
-            
+
             with open(self.cfg.ERROR_CSV, "w", encoding="utf-8", newline="") as f:
                 if self.failed_tracks:
                     writer = csv.DictWriter(f, fieldnames=list(self.failed_tracks[0][0].raw_data.keys()))
                     writer.writeheader()
                     for track, _ in self.failed_tracks:
                         writer.writerow(track.raw_data)
-        except: pass
+        except:
+            pass
 
     def _print_summary(self):
         """Imprime resumen final con Rich"""
         # Calcular duración aproximada si start_time no es accesible
         # (Idealmente RichUI podría trackear start_time o lo pasamos)
-        
+
         stats = self.state.get_stats()
         console.print("\n")
         self.ui.show_summary(stats)

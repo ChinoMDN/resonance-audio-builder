@@ -1,12 +1,13 @@
 import sqlite3
-import time
 import threading
-from typing import List, Dict, Optional
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, List, Optional
 
-from resonance_audio_builder.core.config import Config
 from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.core.config import Config
+
 
 @dataclass
 class DownloadState:
@@ -18,9 +19,10 @@ class DownloadState:
     error: str
     timestamp: float
 
+
 class ProgressDB:
     """Gestor de estado persistente usando SQLite"""
-    
+
     def __init__(self, config: Config):
         self.cfg = config
         self.db_path = config.CHECKPOINT_FILE.replace(".json", ".db")
@@ -32,7 +34,7 @@ class ProgressDB:
         with self.lock:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS downloads (
                     track_id TEXT PRIMARY KEY,
@@ -45,7 +47,7 @@ class ProgressDB:
                     retry_count INTEGER DEFAULT 0
                 )
             """)
-            
+
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)")
             conn.commit()
             conn.close()
@@ -57,7 +59,8 @@ class ProgressDB:
             try:
                 # Si es un error, incrementar retry_count
                 if status == "error":
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT INTO downloads (track_id, artist, title, status, bytes, error, timestamp, retry_count)
                         VALUES (?, ?, ?, ?, ?, ?, ?, 1)
                         ON CONFLICT(track_id) DO UPDATE SET
@@ -65,9 +68,12 @@ class ProgressDB:
                             error = excluded.error,
                             timestamp = excluded.timestamp,
                             retry_count = retry_count + 1
-                    """, (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()))
+                    """,
+                        (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()),
+                    )
                 else:
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT INTO downloads (track_id, artist, title, status, bytes, error, timestamp)
                         VALUES (?, ?, ?, ?, ?, ?, ?)
                         ON CONFLICT(track_id) DO UPDATE SET
@@ -75,8 +81,10 @@ class ProgressDB:
                             bytes = bytes + excluded.bytes,
                             error = NULL,
                             timestamp = excluded.timestamp
-                    """, (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()))
-                
+                    """,
+                        (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()),
+                    )
+
                 conn.commit()
             finally:
                 conn.close()
@@ -101,7 +109,7 @@ class ProgressDB:
                 status = row[0]
                 count = row[1]
                 total_bytes = row[2] or 0
-                
+
                 if status in stats:
                     stats[status] = count
                 stats["bytes"] += total_bytes
@@ -113,17 +121,17 @@ class ProgressDB:
         tracks = []
         with self.lock:
             conn = sqlite3.connect(self.db_path)
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT artist, title, track_id, error FROM downloads
                 WHERE status = 'error' AND retry_count < ?
-            """, (max_retries,))
-            
+            """,
+                (max_retries,),
+            )
+
             for row in cursor:
                 # Reconstruir métadatos mínimos para reintento
-                track = TrackMetadata(
-                    artist=row[0],
-                    title=row[1]
-                )
+                track = TrackMetadata(artist=row[0], title=row[1])
                 tracks.append(track)
             conn.close()
         return tracks

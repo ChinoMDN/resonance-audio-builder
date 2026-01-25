@@ -1,6 +1,7 @@
+import random
 import threading
 import time
-import random
+
 
 class RateLimiter:
     """Rate limiter adaptativo"""
@@ -26,7 +27,9 @@ class RateLimiter:
         """Registra error - aumenta delay"""
         with self.lock:
             self.consecutive_errors += 1
-            self.current_delay = min(self.max_delay, self.current_delay * 1.5)
+            # Jitter de +/- 10%
+            jitter = random.uniform(0.9, 1.1)  # nosec B311
+            self.current_delay = min(self.max_delay, self.current_delay * 1.5 * jitter)
 
     def get_delay(self) -> float:
         return self.current_delay
@@ -34,6 +37,7 @@ class RateLimiter:
 
 class CircuitBreaker:
     """Detiene todas las operaciones si detecta demasiados errores (429)"""
+
     def __init__(self, threshold: int = 3, cooldown: int = 300):
         self.state = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
         self.failures = 0
@@ -41,20 +45,20 @@ class CircuitBreaker:
         self.cooldown = cooldown
         self.last_failure_time = 0
         self.lock = threading.Lock()
-    
+
     def record_failure(self):
         with self.lock:
             self.failures += 1
             self.last_failure_time = time.time()
             if self.failures >= self.threshold:
                 self.state = "OPEN"
-    
+
     def record_success(self):
         with self.lock:
             if self.state == "HALF_OPEN":
                 self.state = "CLOSED"
                 self.failures = 0
-    
+
     def check(self):
         """Lanza excepción si el circuito está abierto"""
         if self.state == "OPEN":

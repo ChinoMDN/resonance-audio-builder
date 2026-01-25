@@ -2,10 +2,12 @@ import json
 import os
 from dataclasses import dataclass
 
+
 class QualityMode:
     HQ_ONLY = "HQ"
     MOBILE_ONLY = "MOB"
     BOTH = "ALL"
+
 
 @dataclass
 class Config:
@@ -14,7 +16,7 @@ class Config:
     INPUT_FOLDER: str = "Playlists"
     PROXIES_FILE: str = "proxies.txt"
     USE_PROXIES: bool = False
-    
+
     ERROR_FILE: str = "Failed_songs.txt"
     ERROR_CSV: str = "Failed_songs.csv"
     CHECKPOINT_FILE: str = "progress.json"

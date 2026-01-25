@@ -1,5 +1,6 @@
-from dataclasses import dataclass, field
 import hashlib
+from dataclasses import dataclass, field
+
 
 @dataclass
 class TrackMetadata:
@@ -35,8 +36,10 @@ class TrackMetadata:
 
         if isrc:
             track_id = f"isrc_{isrc}"
+            if not track_id:
+                track_id = hashlib.md5(f"{artist}_{title}".encode()).hexdigest()[:16]  # nosec B324
         else:
-            track_id = hashlib.md5(f"{artist}_{title}".encode()).hexdigest()[:16]
+            track_id = hashlib.md5(f"{artist}_{title}".encode()).hexdigest()[:16]  # nosec B324
 
         duration_str = get_val("track duration (ms)", "duration_ms", "duration")
         duration = int(duration_str) if duration_str and duration_str.isdigit() else 0
@@ -68,10 +71,10 @@ class TrackMetadata:
         invalids = '<>:"/\\|?*;$#&()![]{}'
         for char in invalids:
             name = name.replace(char, "")
-        
+
         # Sequentially collapse any sequences of dots that could form ..
         while ".." in name:
             name = name.replace("..", ".")
-            
+
         name = name.strip().rstrip(".")
         return name[:150]

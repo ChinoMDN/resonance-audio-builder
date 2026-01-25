@@ -1,12 +1,14 @@
 import time
-import requests
 from pathlib import Path
+
+import requests
 from mutagen.id3 import APIC, COMM, ID3, TALB, TIT2, TPE1, TPE2, TPOS, TRCK, TSRC, TYER, USLT
 from mutagen.mp3 import MP3
 
-from resonance_audio_builder.core.logger import Logger
-from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.audio.lyrics import fetch_lyrics
+from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.core.logger import Logger
+
 
 class MetadataWriter:
     def __init__(self, logger: Logger):
