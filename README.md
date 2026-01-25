@@ -62,15 +62,14 @@ Resonance focuses on **library quality and consistency**, providing:
 
 ---
 
-## Quick Start
+## How to Use
 
-### Prerequisites
+### 1. Prerequisites
 
-- **Python 3.10+**
-- **FFmpeg** – Download from [https://ffmpeg.org](https://ffmpeg.org) and add to PATH
-- **Deno** - Optional Deno-based request handling for session-based access
+- **Python 3.10+** (Recommended)
+- **FFmpeg**: Essential for audio processing. [Download here](https://ffmpeg.org/download.html) and ensure it's in your system PATH.
 
-### Installation
+### 2. Installation
 
 ```bash
 git clone https://github.com/ChinoMDN/resonance-audio-builder.git
@@ -78,16 +77,23 @@ cd resonance-audio-builder
 pip install -r requirements.txt
 ```
 
-### Usage
+### 3. Usage Guide
 
-1. **Standard Mode:**
-    - Export your playlist to CSV and place it in the `Playlists/` folder.
-    - Run: `python run.py`
-    - Select "Start download" -> "All Files" or specific file.
+#### Step A: Prepare your tracks
 
-2. **Watchdog Mode (Automation):**
-    - Run: `python run.py --watch`
-    - Drop any CSV file into `Playlists/`. The download will start automatically!
+Export your playlist to a **CSV file** and place it in the `Playlists/` directory. Ensure it has at least `Artist` and `Title` columns.
+
+#### Step B: Start the builder
+
+You can run the application in three ways:
+
+1.  **Direct Execution (Windows)**: Double-click `run_app.bat`. This is the easiest way to start.
+2.  **Manual CLI**: Run `python run.py`.
+3.  **Watchdog Mode**: Run `python run.py --watch`. The program will monitor the `Playlists/` folder and start downloading as soon as you drop a new CSV file there.
+
+#### Step C: Select Quality
+
+Choose between **High Quality (320kbps)**, **Mobile (96kbps)**, or **Both**. The builder will start processing your list immediately.
 
 ---
 
