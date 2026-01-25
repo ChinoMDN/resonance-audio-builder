@@ -1,0 +1,20 @@
+{
+    "output_folder_hq": "Downloads_HQ",
+    "output_folder_mobile": "Downloads_Mobile",
+    "quality_hq_bitrate": "320",
+    "quality_mobile_bitrate": "96",
+    "max_workers": 3,
+    "max_retries": 3,
+    "duration_tolerance": 15,
+    "search_timeout": 30,
+    "cache_ttl_hours": 168,
+    "rate_limit_delay_min": 0.5,
+    "rate_limit_delay_max": 2.0,
+    "normalize_audio": true,
+    "verify_md5": true,
+    "generate_m3u": true,
+    "save_history": true,
+    "debug_mode": false,
+    "output_format": "mp3",
+    "embed_lyrics": true
+}

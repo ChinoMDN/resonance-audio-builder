@@ -1,0 +1,118 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format follows **[Keep a Changelog](https://keepachangelog.com/en/1.0.0/)**
+This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)**.
+
+---
+
+## [5.0.0] – 2024-01-24
+
+### Added
+
+* External configuration file (`config.json`)
+* Adaptive rate limiting for network stability
+* Visual ASCII-based progress indicators
+* File integrity verification using MD5 hashes
+* Automatic M3U playlist generation
+* Persistent session history tracking
+* Optional Deno-based request handling for restricted content
+* Embedded synchronized and plain lyrics support
+
+### Changed
+
+* Complete UI redesign using structured ASCII layouts
+* Refactored error handling with typed exceptions
+* Improved CSV encoding auto-detection and normalization
+* Internal storage migration from JSON to SQLite
+* Modularization of audio processing pipeline
+
+### Fixed
+
+* Edge cases in interrupted download recovery
+* Metadata mismatches caused by inconsistent CSV headers
+
+---
+
+## [4.2.0] – 2024-01-23
+
+### Added
+
+* Real-time keyboard controls:
+
+  * `P` – Pause / Resume
+  * `S` – Skip current item
+  * `Q` – Graceful shutdown
+* Menu option to retry failed items
+* ETA calculation based on rolling averages
+
+### Changed
+
+* Replaced emoji-based UI elements with ASCII for cross-platform compatibility
+* Improved progress reporting under multi-threaded workloads
+
+---
+
+## [4.1.0] – 2024-01-22
+
+### Added
+
+* Interactive main menu system
+* Cache and progress cleanup options
+* System status and diagnostics panel
+
+### Fixed
+
+* Validation of `cookies.txt` before authenticated requests
+* Incorrect resume behavior after forced termination
+
+---
+
+## [4.0.0] – 2024-01-21
+
+### Added
+
+* Quality selection modes:
+
+  * High Quality only
+  * Mobile Quality only
+  * Dual output
+* Automatic CSV file discovery in project directory
+* Robust CSV encoding detection:
+
+  * UTF-8 (with and without BOM)
+  * Latin-1
+  * CP1252
+* CSV header normalization for improved compatibility
+
+### Changed
+
+* Improved handling of malformed or partial CSV exports
+
+---
+
+## [3.0.0] – 2024-01-20
+
+### Added
+
+* Multi-threaded download and processing pipeline
+* Search result caching with TTL
+* Atomic checkpoint persistence
+* Cover art embedding
+* ID3 metadata tagging support
+
+### Changed
+
+* Migration to a cleaner, layered architecture
+* Introduction of typed domain-specific exceptions
+
+---
+
+## [2.x] – Initial Development
+
+### Added
+
+* Proof-of-concept audio retrieval
+* Basic metadata tagging
+* Single-threaded processing pipeline

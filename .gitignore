@@ -1,0 +1,67 @@
+# Archivos de descarga
+Downloads_HQ/
+Downloads_Mobile/
+
+# Archivos de estado
+progreso.json
+youtube_cache.json
+cache.db
+canciones_fallidas.txt
+canciones_fallidas.csv
+historial.json
+playlist.m3u
+
+# Datos sensibles
+cookies.txt
+*.csv
+!requirements.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/

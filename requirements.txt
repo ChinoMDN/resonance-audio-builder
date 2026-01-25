@@ -1,0 +1,14 @@
+# Core dependencies
+yt-dlp>=2024.1.0
+mutagen>=1.47.0
+requests>=2.31.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+
+bandit>=1.7.0
+
+rich>=13.0.0
+
+pyinstaller>=6.0.0
