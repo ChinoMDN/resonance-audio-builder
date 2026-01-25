@@ -7,7 +7,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import aiohttp
 import yt_dlp
@@ -122,37 +122,45 @@ class AudioDownloader:
         except Exception:
             return image_data
 
+    def _prepare_download_paths(self, subfolder: str, track: TrackMetadata) -> Tuple[Path, Path, bool, bool]:
+        """Calcula y crea las rutas de descarga según el modo"""
+        hq_folder = Path(self.cfg.OUTPUT_FOLDER_HQ) / subfolder
+        mobile_folder = Path(self.cfg.OUTPUT_FOLDER_MOBILE) / subfolder
+
+        needed_hq = self.cfg.MODE in [QualityMode.HQ_ONLY, QualityMode.BOTH]
+        needed_mobile = self.cfg.MODE in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]
+
+        if needed_hq:
+            hq_folder.mkdir(parents=True, exist_ok=True)
+        if needed_mobile:
+            mobile_folder.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{track.safe_filename}.mp3"
+        return hq_folder / filename, mobile_folder / filename, needed_hq, needed_mobile
+
+    async def _check_existing_files(
+        self, hq_path: Path, mobile_path: Path, needed_hq: bool, needed_mobile: bool
+    ) -> Tuple[bool, bool]:
+        """Valida si los archivos ya existen y son válidos"""
+        hq_exists = False
+        if needed_hq and hq_path.exists():
+            hq_exists = await self.validate_audio_file(hq_path)
+
+        mobile_exists = False
+        if needed_mobile and mobile_path.exists():
+            mobile_exists = await self.validate_audio_file(mobile_path)
+
+        return hq_exists, mobile_exists
+
     async def download(
         self, search_result: SearchResult, track: TrackMetadata, check_quit=None, subfolder: str = ""
     ) -> DownloadResult:
         """Async download pipeline"""
         raw_path = None
         try:
-            # 1. Setup paths
-            hq_folder = Path(self.cfg.OUTPUT_FOLDER_HQ) / subfolder
-            mobile_folder = Path(self.cfg.OUTPUT_FOLDER_MOBILE) / subfolder
-
-            needed_hq = self.cfg.MODE in [QualityMode.HQ_ONLY, QualityMode.BOTH]
-            needed_mobile = self.cfg.MODE in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]
-
-            if needed_hq:
-                hq_folder.mkdir(parents=True, exist_ok=True)
-            if needed_mobile:
-                mobile_folder.mkdir(parents=True, exist_ok=True)
-
-            filename = f"{track.safe_filename}.mp3"
-            hq_path = hq_folder / filename
-            mobile_path = mobile_folder / filename
-
-            # 2. Check existence (Async validator?)
-            # Since validation involves ffprobe subprocess, we should await it if file exists
-            hq_exists = False
-            if needed_hq and hq_path.exists():
-                hq_exists = await self.validate_audio_file(hq_path)
-
-            mobile_exists = False
-            if needed_mobile and mobile_path.exists():
-                mobile_exists = await self.validate_audio_file(mobile_path)
+            # 1. Setup paths and check existence
+            hq_path, mobile_path, needed_hq, needed_mobile = self._prepare_download_paths(subfolder, track)
+            hq_exists, mobile_exists = await self._check_existing_files(hq_path, mobile_path, needed_hq, needed_mobile)
 
             todo_hq = needed_hq and not hq_exists
             todo_mob = needed_mobile and not mobile_exists
@@ -278,18 +286,24 @@ class AudioDownloader:
                 audio.tags.add(TPE1(encoding=3, text=track.artist))
             if track.album:
                 audio.tags.add(TALB(encoding=3, text=track.album))
-            if track.album_artist:
-                audio.tags.add(TPE2(encoding=3, text=track.album_artist))
+
+            # Other tags
+            mapping = {
+                TPE2: track.album_artist,
+                TRCK: track.track_number,
+                TPOS: track.disc_number,
+                TSRC: track.isrc,
+            }
+            for tag_class, val in mapping.items():
+                if val:
+                    audio.tags.add(tag_class(encoding=3, text=str(val)))
+
             if track.release_date and len(track.release_date) >= 4:
                 audio.tags.add(TYER(encoding=3, text=track.release_date[:4]))
-            if track.track_number:
-                audio.tags.add(TRCK(encoding=3, text=track.track_number))
-            if track.disc_number:
-                audio.tags.add(TPOS(encoding=3, text=track.disc_number))
-            if track.isrc:
-                audio.tags.add(TSRC(encoding=3, text=track.isrc))
+
             if track.spotify_uri:
                 audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {track.spotify_uri}"))
+
             if track.cover_data:
                 audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=track.cover_data))
 
@@ -298,12 +312,8 @@ class AudioDownloader:
         except Exception as e:
             self.log.debug(f"Metadata error: {e}")
 
-    async def _download_raw(self, url: str, name: str) -> Path:
-        """Async wrapper around yt-dlp download"""
-        temp_dir = Path(tempfile.gettempdir())
-        out_tmpl = temp_dir / f"ytraw_{name}_{int(time.time())}.%(ext)s"
-
-        # Options setup (similar to before)
+    def _get_ytdlp_options(self, out_tmpl: Path, proxy: Optional[str]) -> dict:
+        """Configura el diccionario de opciones para yt-dlp"""
         opts = {
             "format": "bestaudio/best",
             "outtmpl": str(out_tmpl),
@@ -330,29 +340,38 @@ class AudioDownloader:
         }
 
         if self.cfg.DEBUG_MODE:
-            opts["quiet"] = False
-            opts["no_warnings"] = False
-            opts["verbose"] = True
+            opts.update({"quiet": False, "no_warnings": False, "verbose": True})
 
-        proxy = await self.proxy_manager.get_proxy_async() if self.proxy_manager else None
         if proxy:
             opts["proxy"] = proxy
         if self._cookies_valid:
             opts["cookiefile"] = self.cfg.COOKIES_FILE
 
-        # Force logging to file to inspect later
+        return opts
+
+    async def _download_raw(self, url: str, name: str) -> Path:
+        """Async wrapper around yt-dlp download"""
+        # 1. Setup paths and options
+        temp_dir = Path(tempfile.gettempdir())
+        out_tmpl = temp_dir / f"ytraw_{name}_{int(time.time())}.%(ext)s"
+
+        proxy = await self.proxy_manager.get_proxy_async() if self.proxy_manager else None
+        opts = self._get_ytdlp_options(out_tmpl, proxy)
+
+        # 2. Force logging to file
         class FileLogger:
-            def debug(self, msg):
+            def _log(self, prefix, msg):
                 with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
-                    f.write(f"[DEBUG] {msg}\n")
+                    f.write(f"[{prefix}] {msg}\n")
+
+            def debug(self, msg):
+                self._log("DEBUG", msg)
 
             def warning(self, msg):
-                with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
-                    f.write(f"[WARNING] {msg}\n")
+                self._log("WARNING", msg)
 
             def error(self, msg):
-                with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
-                    f.write(f"[ERROR] {msg}\n")
+                self._log("ERROR", msg)
 
         opts["logger"] = FileLogger()
 
@@ -406,7 +425,8 @@ class AudioDownloader:
                 self.proxy_manager.mark_failure(proxy)
             raise YouTubeError(f"Error inesperado en yt-dlp: {e}")
 
-    async def _transcode(self, input_path: Path, output_path: Path, bitrate: str) -> bool:
+    def _build_ffmpeg_cmd(self, input_path: Path, output_path: Path, bitrate: str) -> list:
+        """Construye el comando ffmpeg modularmente"""
         cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(input_path), "-vn"]
         if self.cfg.NORMALIZE_AUDIO:
             cmd.extend(["-filter:a", "loudnorm=I=-14:TP=-1.5:LRA=11"])
@@ -426,6 +446,10 @@ class AudioDownloader:
                 str(output_path),
             ]
         )
+        return cmd
+
+    async def _transcode(self, input_path: Path, output_path: Path, bitrate: str) -> bool:
+        cmd = self._build_ffmpeg_cmd(input_path, output_path, bitrate)
 
         try:
             # Async subprocess

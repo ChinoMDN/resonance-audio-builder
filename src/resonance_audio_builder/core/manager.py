@@ -50,7 +50,6 @@ class DownloadManager:
 
     async def run(self, tracks: List[TrackMetadata]):
         """Ejecuta la descarga de todas las canciones (Async)"""
-
         # Filtrar ya procesadas
         pending = [t for t in tracks if not self.state.is_done(t.track_id)]
 
@@ -60,8 +59,64 @@ class DownloadManager:
 
         clear_screen()
         print_header()
+        self._print_batch_summary(tracks, pending)
 
-        # Mostrar queue
+        if not Confirm.ask("Start download?", default=True):
+            console.print("[yellow]Cancelled by user.[/yellow]")
+            return
+
+        print()
+
+        # Start Live Display
+        self.ui.start(len(pending))
+
+        # Fill Queue
+        self.log.debug(f"filling queue with {len(pending)} items")
+        for t in pending:
+            await self.queue.put(t)
+        self.log.debug("queue filled")
+
+        # Start keyboard listener (Thread)
+        self.keyboard.start()
+
+        # Start Workers
+        self.log.debug(f"starting {self.cfg.MAX_WORKERS} workers")
+        workers = []
+        for i in range(self.cfg.MAX_WORKERS):
+            task = asyncio.create_task(self._worker())
+            workers.append(task)
+        self.log.debug("workers started")
+
+        # Wait for queue to empty
+        try:
+            while not self.queue.empty():
+                if self.keyboard.should_quit():
+                    break
+                await asyncio.sleep(0.5)
+
+            if not self.keyboard.should_quit():
+                await self.queue.join()
+
+        except asyncio.CancelledError:
+            pass
+        finally:
+            for w in workers:
+                w.cancel()
+
+            while not self.queue.empty():
+                try:
+                    self.queue.get_nowait()
+                    self.queue.task_done()
+                except Exception:
+                    break
+
+            self.keyboard.stop()
+            self.ui.stop()
+            self._save_failed()
+            self._print_summary()
+
+    def _print_batch_summary(self, tracks: List[TrackMetadata], pending: List[TrackMetadata]):
+        """Muestra el resumen visual de la cola de descarga"""
         table = Table(title=f"Download Queue ({len(pending)} pending)", expand=True, box=None)
         table.add_column("Track", style="bold white")
         table.add_column("Artist", style="cyan")
@@ -99,85 +154,65 @@ class DownloadManager:
 
         console.print(Panel(summary, title="Batch Summary", border_style="green"))
 
-        if not Confirm.ask("Start download?", default=True):
-            console.print("[yellow]Cancelled by user.[/yellow]")
-            return
-
-        print()
-
-        # Start Live Display
-        self.ui.start(len(pending))
-
-        # Fill Queue
-        self.log.debug(f"filling queue with {len(pending)} items")
-        for t in pending:
-            await self.queue.put(t)
-        self.log.debug("queue filled")
-
-        # Start keyboard listener (Thread)
-        self.keyboard.start()
-
-        # Start Workers
-        self.log.debug(f"starting {self.cfg.MAX_WORKERS} workers")
-        workers = []
-        for i in range(self.cfg.MAX_WORKERS):
-            task = asyncio.create_task(self._worker())
-            workers.append(task)
-        self.log.debug("workers started")
-
-        # Wait for queue to empty
-        try:
-            # Monitor queue and keyboard
-            while not self.queue.empty():
-                if self.keyboard.should_quit():
-                    break
-
-                # Check if all workers died? No, they loop until cancelled or queue empty check inside
-                # Actually _worker pops from queue.
-                # We can just join the queue, but we need to check keyboard interrupt.
-                # So we poll queue empty + keyboard
-                await asyncio.sleep(0.5)
-
-            # Wait for remaining tasks in queue (if not quitting)
-            if not self.keyboard.should_quit():
-                await self.queue.join()
-
-        except asyncio.CancelledError:
-            pass
-        finally:
-            # Setup for clean exit
-            for w in workers:
-                w.cancel()
-
-            # Drain queue if quitting
-            while not self.queue.empty():
-                try:
-                    self.queue.get_nowait()
-                    self.queue.task_done()
-                except Exception:
-                    break
-
-            self.keyboard.stop()
-            self.ui.stop()
-            self._save_failed()
-            self._print_summary()
-
-    async def _worker(self):
-        """Async worker"""
-        self.log.debug("worker started")
-        while True:
+    async def _process_track_attempts(self, track: TrackMetadata, task_id: str) -> bool:
+        """Maneja los reintentos para una canción específica con gestión de errores detallada"""
+        attempt = 0
+        last_error = ""
+        while attempt < self.cfg.MAX_RETRIES:
+            if self.keyboard.should_quit():
+                return False
+            attempt += 1
             try:
-                # Get track without waiting too long so we can check cancellation
-                track = await self.queue.get()
-                self.log.debug(f"worker got track: {track.title}")
-            except asyncio.CancelledError:
-                self.log.debug("worker cancelled")
+                # 1. Search
+                self.ui.update_task_status(task_id, "[cyan]Searching...[/cyan]")
+                search_result = await self.searcher.search(track)
+
+                # 2. Download
+                self.ui.update_task_status(task_id, "[blue]Downloading...[/blue]")
+                subfolder = getattr(track, "playlist_subfolder", "")
+                result = await self.downloader.download(
+                    search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder
+                )
+
+                if not result.success:
+                    raise RecoverableError(result.error or "Unknown error")
+
+                # Success logic
+                status = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
+                self.ui.update_task_status(task_id, status)
+                self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
+                self.ui.update_main_progress(1)
+                return True
+
+            except FatalError as e:
+                last_error = str(e)
+                self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+                break
+            except RecoverableError as e:
+                last_error = str(e)
+                self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
+                if attempt < self.cfg.MAX_RETRIES:
+                    await asyncio.sleep(2 * attempt)
+            except Exception as e:
+                last_error = str(e)
+                self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+                self.log.debug(f"Unexpected error for {track.title}: {traceback.format_exc()}")
                 break
 
-            task_id = None
+        # If we reach here, it failed
+        if not self.keyboard.should_quit():
+            self.ui.update_task_status(task_id, f"[red]Failed: {last_error}[/red]")
+            self.state.mark(track, "error", error=last_error)
+            self.ui.update_main_progress(1)
+            self.failed_tracks.append((track, last_error))
+        return False
+
+    async def _worker(self):
+        """Async worker modularizado"""
+        while True:
             try:
-                # Check Pause
-                while self.keyboard.is_paused():
+                track = await self.queue.get()
+                if self.keyboard.is_paused():
                     await asyncio.sleep(0.5)
 
                 if self.keyboard.should_quit():
@@ -190,76 +225,20 @@ class DownloadManager:
                     self.queue.task_done()
                     continue
 
-                attempt = 0
-                success = False
-                last_error = ""
+                task_id = self.ui.add_download_task(track.artist, track.title)
+                try:
+                    await self._process_track_attempts(track, task_id)
+                finally:
+                    if task_id:
+                        await asyncio.sleep(2.0)
+                        self.ui.remove_task(task_id)
+                    self.queue.task_done()
 
-                while attempt < self.cfg.MAX_RETRIES and not success:
-                    if self.keyboard.should_quit():
-                        break
-
-                    # Create task strictly before starting attempt to show status
-                    if not task_id:
-                        task_id = self.ui.add_download_task(track.artist, track.title)
-
-                    attempt += 1
-
-                    try:
-                        # 1. Search (Async)
-                        self.ui.update_task_status(task_id, "[cyan]Searching...[/cyan]")
-                        self.log.debug(f"starting search for {track.title}")
-                        search_result = await self.searcher.search(track)
-                        self.log.debug(f"search done for {track.title}")
-
-                        # 2. Download (Async)
-                        self.ui.update_task_status(task_id, "[blue]Downloading...[/blue]")
-                        subfolder = getattr(track, "playlist_subfolder", "")
-
-                        result = await self.downloader.download(
-                            search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder
-                        )
-                        # Download finished
-
-                        if not result.success:
-                            raise RecoverableError(result.error or "Unknown download error")
-
-                        status_str = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
-                        self.ui.update_task_status(task_id, status_str)
-                        self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
-                        self.ui.update_main_progress(1)
-                        success = True
-
-                    except FatalError as e:
-                        last_error = str(e)
-                        self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
-                        self.log.debug(f"Error fatal: {e}")
-                        break
-
-                    except RecoverableError as e:
-                        last_error = str(e)
-                        self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
-                        if attempt < self.cfg.MAX_RETRIES:
-                            self.log.debug(f"Reintento {attempt}: {e}")
-                            await asyncio.sleep(2 * attempt)
-
-                    except Exception as e:
-                        last_error = str(e)
-                        self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
-                        self.log.debug(f"Error inesperado: {traceback.format_exc()}")
-                        break
-
-                if not success and not self.keyboard.should_quit():
-                    self.ui.update_task_status(task_id, f"[red]Failed: {last_error}[/red]")
-                    self.state.mark(track, "error", error=last_error)
-                    self.ui.update_main_progress(1)
-                    self.failed_tracks.append((track, last_error))
-
-            finally:
-                if task_id:
-                    # Delay removal so user can see result (Success/Fail)
-                    await asyncio.sleep(2.0)
-                    self.ui.remove_task(task_id)
-                self.queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.log.error(f"Worker loop error: {e}")
+                await asyncio.sleep(1)
 
     def _save_failed(self):
         if not self.failed_tracks:

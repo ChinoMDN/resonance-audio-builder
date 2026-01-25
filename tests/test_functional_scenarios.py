@@ -1,5 +1,5 @@
-import pytest
 from resonance_audio_builder.audio.metadata import TrackMetadata
+
 
 class TestRealWorldScenarios:
     """Scenarios based on real usage patterns"""
@@ -18,5 +18,5 @@ class TestRealWorldScenarios:
     def test_special_characters_handling(self):
         """Emoji and unicode should be preserved or sanitized"""
         t = TrackMetadata("id2", "🔥 Fire Track 🔥", "Artist")
-         # Check sanitization logic if implemented in metadata class
+        # Check sanitization logic if implemented in metadata class
         assert "Fire Track" in t.safe_filename

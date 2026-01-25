@@ -1,7 +1,9 @@
-import pytest
 import os
-import sys
+
+import pytest
+
 from resonance_audio_builder.audio.metadata import TrackMetadata
+
 
 class TestSecurityConcerns:
     def test_filename_path_traversal_attack(self):
@@ -16,8 +18,9 @@ class TestSecurityConcerns:
         t = TrackMetadata("id2", "; rm -rf /", "Hacker")
         assert ";" not in t.safe_filename
 
+
 class TestCrossPlatform:
-    @pytest.mark.skipif(os.name != 'nt', reason="Windows specific")
+    @pytest.mark.skipif(os.name != "nt", reason="Windows specific")
     def test_windows_reserved_filenames(self):
         """CON, AUX should be mapped"""
         t = TrackMetadata("id3", "CON", "Artist")
@@ -27,5 +30,6 @@ class TestCrossPlatform:
         """Paths should use correct separators"""
         # Just generic check
         import pathlib
+
         p = pathlib.Path("a/b")
         assert str(p) == f"a{os.sep}b"

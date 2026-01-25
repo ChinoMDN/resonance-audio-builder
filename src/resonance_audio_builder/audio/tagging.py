@@ -14,13 +14,58 @@ class MetadataWriter:
     def __init__(self, logger: Logger):
         self.log = logger
 
+    def _add_text_tags(self, audio, meta: TrackMetadata):
+        """Aplica etiquetas de texto básicas"""
+        tags = {
+            TIT2: meta.title,
+            TPE1: meta.artist,
+            TALB: meta.album,
+            TPE2: meta.album_artist,
+            TRCK: meta.track_number,
+            TPOS: meta.disc_number,
+            TSRC: meta.isrc,
+        }
+
+        for tag_class, value in tags.items():
+            if value:
+                try:
+                    audio.tags.add(tag_class(encoding=3, text=str(value)))
+                except Exception as e:
+                    self.log.debug(f"Error adding tag {tag_class.__name__}: {e}")
+
+        if meta.release_date and len(meta.release_date) >= 4:
+            audio.tags.add(TYER(encoding=3, text=meta.release_date[:4]))
+
+        if meta.spotify_uri:
+            audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {meta.spotify_uri}"))
+
+    def _add_cover(self, audio, meta: TrackMetadata):
+        """Descarga y aplica la carátula"""
+        if meta.cover_url:
+            try:
+                resp = requests.get(meta.cover_url, timeout=10)
+                if resp.status_code == 200 and len(resp.content) > 0:
+                    audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=resp.content))
+            except Exception as e:
+                self.log.debug(f"Error descargando caratula: {e}")
+
+    def _add_lyrics(self, audio, meta: TrackMetadata):
+        """Busca y aplica las letras"""
+        try:
+            lyrics = fetch_lyrics(meta.artist, meta.title, meta.duration_seconds)
+            if lyrics:
+                audio.tags.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
+                self.log.debug(f"Letras embebidas para: {meta.title}")
+        except Exception as e:
+            self.log.debug(f"Error obteniendo letras: {e}")
+
     def write(self, path: Path, meta: TrackMetadata):
-        """Escribe tags ID3 y carátula"""
+        """Escribe todos los metadatos en el archivo"""
         if not path.exists():
             return
 
         try:
-            # Cargar o crear tags
+            # 1. Cargar audio
             try:
                 audio = MP3(str(path), ID3=ID3)
             except Exception:
@@ -29,51 +74,13 @@ class MetadataWriter:
             if audio.tags is None:
                 audio.add_tags()
 
-            # Tags de texto (encoding=3 = UTF-16)
-            def add_tag(tag_class, value):
-                if value:
-                    try:
-                        audio.tags.add(tag_class(encoding=3, text=str(value)))
-                    except Exception as e:
-                        self.log.debug(f"Error adding tag {tag_class.__name__}: {e}")
-
+            # 2. Aplicar componentes
             self.log.debug(f"Writing metadata for {meta.title}...")
+            self._add_text_tags(audio, meta)
+            self._add_cover(audio, meta)
+            self._add_lyrics(audio, meta)
 
-            add_tag(TIT2, meta.title)
-            add_tag(TPE1, meta.artist)
-            add_tag(TALB, meta.album)
-            add_tag(TPE2, meta.album_artist)
-
-            if meta.release_date and len(meta.release_date) >= 4:
-                add_tag(TYER, meta.release_date[:4])
-
-            add_tag(TRCK, meta.track_number)
-            add_tag(TPOS, meta.disc_number)
-            add_tag(TSRC, meta.isrc)
-
-            if meta.spotify_uri:
-                audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {meta.spotify_uri}"))
-
-            # Caratula
-            if meta.cover_url:
-                try:
-                    resp = requests.get(meta.cover_url, timeout=10)
-                    if resp.status_code == 200 and len(resp.content) > 0:
-                        audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=resp.content))
-                except Exception as e:
-                    self.log.debug(f"Error descargando caratula: {e}")
-
-            # Letras (USLT tag)
-            try:
-                lyrics = fetch_lyrics(meta.artist, meta.title, meta.duration_seconds)
-                if lyrics:
-                    audio.tags.add(USLT(encoding=3, lang="eng", desc="", text=lyrics))
-                    self.log.debug(f"Letras embebidas para: {meta.title}")
-            except Exception as e:
-                self.log.debug(f"Error obteniendo letras: {e}")
-
-            # Guardar como ID3v2.3 (mejor compatibilidad)
-            # Reintentar guardar si hay bloqueo de archivo
+            # 3. Guardar con reintentos
             max_retries = 3
             for i in range(max_retries):
                 try:

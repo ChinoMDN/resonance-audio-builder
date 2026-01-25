@@ -87,7 +87,8 @@ class YouTubeSearcher:
 
         raise NotFoundError(f"No encontrado: {track.artist} - {track.title}")
 
-    async def _lookup(self, cache_key: str, query: str, duration: int) -> Optional[SearchResult]:
+    async def _get_search_options(self) -> dict:
+        """Configura las opciones de búsqueda de yt-dlp"""
         opts = {
             "quiet": True,
             "no_warnings": True,
@@ -97,7 +98,6 @@ class YouTubeSearcher:
             "http_headers": {"User-Agent": random.choice(USER_AGENTS)},
         }
 
-        # Get proxy asynchronously
         if self.proxy_manager:
             proxy = await self.proxy_manager.get_proxy_async()
             if proxy:
@@ -105,6 +105,11 @@ class YouTubeSearcher:
 
         if self._cookies_valid:
             opts["cookiefile"] = self.cfg.COOKIES_FILE
+
+        return opts
+
+    async def _lookup(self, cache_key: str, query: str, duration: int) -> Optional[SearchResult]:
+        opts = await self._get_search_options()
 
         try:
             # Run blocking yt-dlp in executor

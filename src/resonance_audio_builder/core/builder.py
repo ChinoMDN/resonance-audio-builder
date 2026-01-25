@@ -5,7 +5,7 @@ import os
 import shutil
 import traceback
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -179,59 +179,56 @@ class App:
         print(f"[!] Error leyendo CSV: {filepath}")
         return []
 
+    def _collect_tracks(self, csv_files: List[str]) -> List[TrackMetadata]:
+        """Lee y agrupa canciones de múltiples CSVs"""
+        all_tracks = []
+        for csv_file in csv_files:
+            rows = self._read_csv(csv_file)
+            playlist_name = Path(csv_file).stem
+            if rows:
+                for row in rows:
+                    t = TrackMetadata.from_csv_row(row)
+                    setattr(t, "playlist_subfolder", playlist_name)
+                    all_tracks.append(t)
+        return all_tracks
+
+    def _deduplicate_tracks(self, tracks: List[TrackMetadata]) -> List[TrackMetadata]:
+        """Elimina canciones duplicadas por ID"""
+        unique = {}
+        for t in tracks:
+            if t.track_id not in unique:
+                unique[t.track_id] = t
+        return list(unique.values())
+
+    def _get_selected_csvs(self, csv_files: Optional[List[str]]) -> List[str]:
+        """Obtiene la lista de CSVs a procesar"""
+        if csv_files is not None:
+            return csv_files
+
+        clear_screen()
+        print_header()
+        return self._select_csv()
+
     def _start_download(self, csv_files: List[str] = None, ask_quality: bool = True):
-        """
-        Inicia descarga de lista de CSVs.
-        Si csv_files es None, pide selección al usuario.
-        """
-        if csv_files is None:
-            clear_screen()
-            print_header()
-            csv_files = self._select_csv()
-            if not csv_files:
-                console.print("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
-                return
+        """Inicia descarga de lista de CSVs modularmente"""
+        csv_files = self._get_selected_csvs(csv_files)
+        if not csv_files:
+            console.print("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
+            return
 
         if ask_quality:
             self._select_quality()
 
-        all_tracks = []
-        for csv_file in csv_files:
-            print(f"\n[i] Reading {csv_file}...")
-            rows = self._read_csv(csv_file)
-
-            # Determine playlist name for subfolder
-            # csv_file is a path string, we want filename without extension
-            playlist_name = Path(csv_file).stem
-
-            if rows:
-                tracks = []
-                for row in rows:
-                    t = TrackMetadata.from_csv_row(row)
-                    # Inject subfolder attribute dynamically
-                    # We use setattr to attach it to the instance
-                    setattr(t, "playlist_subfolder", playlist_name)
-                    tracks.append(t)
-
-                all_tracks.extend(tracks)
-
+        all_tracks = self._collect_tracks(csv_files)
         if not all_tracks:
             print("\n[!] No tracks found in selected files.")
             if ask_quality:
                 input("\nENTER para continuar...")
             return
 
-        # Eliminar duplicados globales
-        unique = {}
-        for t in all_tracks:
-            if t.track_id not in unique:
-                unique[t.track_id] = t
-
-        tracks = list(unique.values())
-
+        tracks = self._deduplicate_tracks(all_tracks)
         print(f"\n[i] {len(tracks)} canciones únicas detectadas en total")
 
-        # Ejecutar descarga
         try:
             manager = DownloadManager(self.cfg, self.cache)
             asyncio.run(manager.run(tracks))
@@ -282,69 +279,53 @@ class App:
 
         input("\nENTER para continuar...")
 
-    def _clear_cache(self):
-        clear_screen()
-        print_header()
-
-        table = Table(title="Clear Data", show_header=False, box=None)
-        table.add_row("[1] Clear Search Cache (SQLite/YouTube)")
-        table.add_row("[2] Clear Progress (Reset done list)")
-        table.add_row("[3] Clear All")
-        table.add_row("[0] Cancel")
-
-        console.print(Panel(table, border_style="red"))
-
-        sel = Prompt.ask("Option", choices=["0", "1", "2", "3"], default="0")
-
-        if sel == "0":
-            console.print("[yellow]Cancelled.[/yellow]")
-            Prompt.ask("\nPress ENTER to continue")
-            return
-
+    def _perform_clear(self, sel: str) -> List[str]:
+        """Ejecuta la limpieza solicitada"""
         deleted = []
-
-        # Clear Search Cache (SQLite + JSON legacy)
+        # Cache
         if sel in ["1", "3"]:
             if self.cache:
                 self.cache.clear()
             deleted.append("Cache (SQLite)")
-
-            # Also delete cache.db file
-            if os.path.exists("cache.db"):
-                try:
-                    os.remove("cache.db")
-                except Exception:
-                    pass
-
-            # Legacy JSON cache
-            if os.path.exists(self.cfg.CACHE_FILE):
-                try:
-                    os.remove(self.cfg.CACHE_FILE)
-                except Exception:
-                    pass
-
-        # Clear Progress
+            for f in ["cache.db", self.cfg.CACHE_FILE]:
+                if os.path.exists(f):
+                    try:
+                        os.remove(f)
+                    except Exception:
+                        pass
+        # Progress
         if sel in ["2", "3"]:
             self.db.clear()
             deleted.append("Progress (DB)")
-
-        # Clear All also deletes history and playlist
+        # Extra (sel 3 only)
         if sel == "3":
-            # History file
-            if os.path.exists(self.cfg.HISTORY_FILE):
-                try:
-                    os.remove(self.cfg.HISTORY_FILE)
-                    deleted.append("History")
-                except Exception:
-                    pass
+            for f in [self.cfg.HISTORY_FILE, self.cfg.M3U_FILE]:
+                if os.path.exists(f):
+                    try:
+                        os.remove(f)
+                        deleted.append(Path(f).name)
+                    except Exception:
+                        pass
+        return deleted
 
-            # M3U playlist
-            if os.path.exists(self.cfg.M3U_FILE):
-                try:
-                    os.remove(self.cfg.M3U_FILE)
-                    deleted.append("Playlist M3U")
-                except Exception:
-                    pass
+    def _clear_cache(self):
+        """Menú de limpieza modular"""
+        clear_screen()
+        print_header()
+        table = Table(title="Clear Data", show_header=False, box=None)
+        rows = [("[1]", "Clear Search Cache"), ("[2]", "Clear Progress"), ("[3]", "Clear All"), ("[0]", "Cancel")]
+        for r in rows:
+            table.add_row(r[0], r[1])
+
+        console.print(Panel(table, border_style="red"))
+        sel = Prompt.ask("Option", choices=["0", "1", "2", "3"], default="0")
+        if sel == "0":
+            return
+
+        deleted = self._perform_clear(sel)
+        if deleted:
+            console.print(f"[green]Deleted: {', '.join(deleted)}[/green]")
+        Prompt.ask("\nPress ENTER to continue")
 
         if deleted:
             console.print(f"[green]Deleted: {', '.join(deleted)}[/green]")

@@ -1,7 +1,9 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-import time
-from unittest.mock import MagicMock, patch, AsyncMock
+
 from resonance_audio_builder.network.proxies import SmartProxyManager
+
 
 class TestProxyManager:
     @pytest.fixture
@@ -29,7 +31,7 @@ class TestProxyManager:
             mock_resp.status = 200
             mock_resp.read.return_value = b"google"
             mock_get.return_value.__aenter__.return_value = mock_resp
-            
+
             # Use the internal _check_health method
             await proxy_manager._check_health(proxy_manager.proxies["http://p1"])
             assert proxy_manager.proxies["http://p1"].healthy is True
@@ -40,7 +42,7 @@ class TestProxyManager:
         # Need 6 failures to ban (> 5)
         for _ in range(6):
             proxy_manager.mark_failure(proxy)
-            
+
         assert proxy_manager.proxies[proxy].healthy is False
 
     def test_disabled_returns_none(self):
