@@ -228,6 +228,14 @@ Yes. Progress is saved automatically.
 **Q: Is this cross-platform?**
 Yes. The Python version works on Windows, Linux, and macOS.
 
+**Q: How does this compare to spotDL or SpotDown?**
+While tools like **spotDL** or **SpotDown** are excellent for quickly mirroring Spotify playlists, **Resonance** is built with a focus on **Library Curation and Audio Consistency**:
+
+- **Source Agnostic**: Works with any CSV export (Spotify, Apple Music, Tidal, etc.), not tied to a single platform.
+- **Audio Integrity**: Includes **Spectral Analysis** to detect and reject "Fake HQ" (upscaled) files.
+- **Loudness Normalization**: Uses professional **EBU R128** standards so your entire library sounds consistent.
+- **OpSec & Stability**: Advanced proxy management and custom yt-dlp configurations to handle recent platform changes more robustly.
+
 ---
 
 ## Contributing
