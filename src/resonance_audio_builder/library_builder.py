@@ -1946,15 +1946,53 @@ class App:
             return
 
         deleted = []
+        
+        # Clear Search Cache (SQLite + JSON legacy)
         if sel in ["1", "3"]:
             self.cache.clear()
             deleted.append("Cache (SQLite)")
+            
+            # Also delete cache.db file
+            if os.path.exists("cache.db"):
+                try:
+                    os.remove("cache.db")
+                except:
+                    pass
+                    
+            # Legacy JSON cache
+            if os.path.exists(self.cfg.CACHE_FILE):
+                try:
+                    os.remove(self.cfg.CACHE_FILE)
+                except:
+                    pass
 
+        # Clear Progress
         if sel in ["2", "3"]:
             if os.path.exists(self.cfg.CHECKPOINT_FILE):
-                os.remove(self.cfg.CHECKPOINT_FILE)
-                self.tracker.reset_all()
-                deleted.append("Progress")
+                try:
+                    os.remove(self.cfg.CHECKPOINT_FILE)
+                except:
+                    pass
+            self.tracker.reset_all()
+            deleted.append("Progress")
+
+        # Clear All also deletes history and playlist
+        if sel == "3":
+            # History file
+            if os.path.exists(self.cfg.HISTORY_FILE):
+                try:
+                    os.remove(self.cfg.HISTORY_FILE)
+                    deleted.append("History")
+                except:
+                    pass
+            
+            # M3U playlist
+            if os.path.exists(self.cfg.M3U_FILE):
+                try:
+                    os.remove(self.cfg.M3U_FILE)
+                    deleted.append("Playlist M3U")
+                except:
+                    pass
 
         if deleted:
             console.print(f"[green]Deleted: {', '.join(deleted)}[/green]")
