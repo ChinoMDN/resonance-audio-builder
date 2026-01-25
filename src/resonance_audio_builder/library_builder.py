@@ -570,12 +570,19 @@ class CacheManager:
                 pass
 
     def clear(self):
-        with self.lock:
-            try:
-                self.cursor.execute("DELETE FROM cache")
-                self.conn.commit()
-            except:
-                pass
+        if not hasattr(self, "cursor"):
+            return
+        # Use acquire with timeout to prevent deadlock
+        acquired = self.lock.acquire(timeout=5)
+        if not acquired:
+            return
+        try:
+            self.cursor.execute("DELETE FROM cache")
+            self.conn.commit()
+        except Exception:
+            pass
+        finally:
+            self.lock.release()
 
     def count(self) -> int:
         if not hasattr(self, "cursor"):
