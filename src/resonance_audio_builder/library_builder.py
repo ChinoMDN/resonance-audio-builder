@@ -654,7 +654,7 @@ class RichProgressTracker:
     def __init__(self, config: Config):
         self.cfg = config
         self.processed: Set[str] = set()
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()  # RLock allows nested acquire
 
         self.ok_count = 0
         self.err_count = 0
@@ -715,10 +715,20 @@ class RichProgressTracker:
             self.start_time = time.time()
 
     def reset_all(self):
+        """Reset all progress - uses RLock so nested calls work"""
         with self.lock:
             self.processed.clear()
-            self.save()
             self.reset_stats()
+        # Save outside of lock to avoid potential issues
+        self._save_no_lock()
+
+    def _save_no_lock(self):
+        """Internal save without acquiring lock"""
+        try:
+            with open(self.cfg.CHECKPOINT_FILE, "w", encoding="utf-8") as f:
+                json.dump(list(self.processed), f)
+        except:
+            pass
 
     def get_stats_string(self) -> str:
         with self.lock:
