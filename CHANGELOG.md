@@ -19,6 +19,14 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - Code formatting with Black and isort
 - Type hints and mypy configuration
 - Comprehensive test suite (27 tests)
+- **Metadata Injection:** Full ID3 tag support including Cover Art
+- **Enhanced Cleanup:** "Clear All" option now thoroughly removes cache and history
+
+### Fixed
+
+- **Deadlock:** Fixed application hang when clearing cache (Menu option 3)
+- **Cleanup:** Fixed "Clear All" not deleting all data files (history, playlists)
+- **Stability:** Improved thread safety in progress tracker using `RLock`
 
 ### Changed
 
