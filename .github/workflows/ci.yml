@@ -98,3 +98,29 @@ jobs:
             - name: Lint with flake8
               run: flake8 src/resonance_audio_builder/ --max-line-length=120 --ignore=E501,W503 --count --select=E9,F63,F7,F82
               continue-on-error: true
+
+    build:
+        needs: test
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements.txt
+                  pip install pyinstaller watchdog rich
+
+            - name: Build Executable
+              run: |
+                  pyinstaller --clean --onefile --name "ResonanceMusicBuilder" --paths src --collect-all rich --collect-all watchdog --hidden-import resonance_audio_builder src/resonance_audio_builder/cli.py
+
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ResonanceMusicBuilder-Windows
+                  path: dist/ResonanceMusicBuilder.exe
