@@ -7,6 +7,18 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [7.0.1] – 2026-01-25
+
+### Fixed
+
+- **Downloader Stability:** Fixed logic error where search results weren't correctly passed to the downloader.
+- **YouTube Compatibility:** Mitigated `HTTP 403 Forbidden` errors by implementing enhanced `yt-dlp` arguments (`player_client`, `po_token`) and headers.
+- **Audio Analysis:** Fixed `NameError` and argument mismatch in spectral analyzer.
+- **Temp File Management:** Reverted raw downloads to the system's temporary directory for a cleaner workspace.
+- **Metadata Consistency:** Removed redundant metadata injection in the management layer.
+
+---
+
 ## [7.0.0] – 2026-01-24
 
 ### Added

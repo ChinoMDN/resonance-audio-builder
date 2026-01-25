@@ -1,5 +1,5 @@
 # Core dependencies
-yt-dlp>=2024.1.0
+yt-dlp>=2024.12.08
 mutagen>=1.47.0
 requests>=2.31.0
 

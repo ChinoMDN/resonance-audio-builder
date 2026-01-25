@@ -134,7 +134,8 @@ class RichProgressTracker:
         if hasattr(self, "log_text"):
             start_idx = max(0, len(self.log_buffer) - 10)
             # Remove rich tags for cleaner log history in UI
-            clean_text = "\n".join(self.log_buffer[start_idx:])
+            # self.log_buffer is a deque, convert to list to slice
+            clean_text = "\n".join(list(self.log_buffer)[start_idx:])
             self.log_text.plain = clean_text  # Update Text object in-place
 
     def stop(self):

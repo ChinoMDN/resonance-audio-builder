@@ -101,7 +101,7 @@ Consistency and readability are prioritized over micro-optimizations.
 
 ---
 
-## Code Structure (v7.0)
+## Code Structure (v7.x)
 
 The project follows a domain-driven modular architecture:
 

@@ -9,7 +9,7 @@ class AudioAnalyzer:
         self.log = logger
         self.lock = threading.Lock()
 
-    def analyze_integrity(self, file_path: Path, cutoff_freq: int = 16000) -> bool:
+    def analyze_integrity(self, file_path: Path, cutoff_hz: int = 16000) -> bool:
         """
         Analiza si el audio tiene frecuencias por encima del cutoff.
         Retorna True si el audio es 'genuino' (tiene contenido en agudos).
@@ -30,7 +30,7 @@ class AudioAnalyzer:
         cmd = [
             "ffmpeg",
             "-i", str(file_path),
-            "-af", f"highpass=f={cutoff_freq},astats=metadata=1:reset=1",
+            "-af", f"highpass=f={cutoff_hz},astats=metadata=1:reset=1",
             "-f", "null",
             "-"
         ]
@@ -64,7 +64,7 @@ class AudioAnalyzer:
                 # Si el RMS de las frecuencias >16kHz es menor a -80dB, consideramos que no hay contenido.
                 # Un archivo real de 320kbps suele tener contenido audible en 16-20kHz (-40 a -60dB).
                 
-                self.log.debug(f"HF RMS Level (> {cutoff_freq}Hz): {level_db} dB")
+                self.log.debug(f"HF RMS Level (> {cutoff_hz}Hz): {level_db} dB")
                 
                 if level_db == float("-inf") or level_db < -85.0:
                     return False  # Fake HQ

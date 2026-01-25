@@ -18,14 +18,15 @@ sys.path.insert(0, os.path.join(root_dir, 'src'))
 
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.audio.metadata import TrackMetadata
-from resonance_audio_builder.audio.youtube import SearchResult
-from resonance_audio_builder.audio.downloader import DownloadResult
+from resonance_audio_builder.audio.youtube import SearchResult, YouTubeSearcher
+from resonance_audio_builder.audio.downloader import DownloadResult, AudioDownloader
 from resonance_audio_builder.network.limiter import RateLimiter
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.ui import format_time, format_size, progress_bar
 from resonance_audio_builder.core.utils import calculate_md5, export_m3u, save_history
 from resonance_audio_builder.network.utils import validate_cookies_file
 from resonance_audio_builder.network.cache import CacheManager
+from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
 
 
 class TestConfig:

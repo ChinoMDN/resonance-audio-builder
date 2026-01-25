@@ -83,6 +83,11 @@ class Config:
                     "generate_m3u": "GENERATE_M3U",
                     "save_history": "SAVE_HISTORY",
                     "debug_mode": "DEBUG_MODE",
+                    "output_format": "OUTPUT_FORMAT",
+                    "embed_lyrics": "EMBED_LYRICS",
+                    "input_folder": "INPUT_FOLDER",
+                    "proxies_file": "PROXIES_FILE",
+                    "use_proxies": "USE_PROXIES",
                 }
                 for json_key, attr in mapping.items():
                     if json_key in data:

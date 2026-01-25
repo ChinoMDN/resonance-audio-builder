@@ -207,13 +207,13 @@ resonance-audio-builder/
 
 ## Troubleshooting
 
-| Issue                   | Resolution                              |
-| ----------------------- | --------------------------------------- |
-| FFmpeg not found        | Install FFmpeg and ensure it is in PATH |
-| Authentication required | Provide valid cookies                   |
-| HTTP 429                | Reduce concurrency                      |
-| Empty output            | Check connectivity and dependencies     |
-| Lyrics missing          | Track may not exist in lyric databases  |
+| Issue              | Resolution                                                 |
+| ------------------ | ---------------------------------------------------------- |
+| FFmpeg not found   | Install FFmpeg and ensure it is in PATH                    |
+| HTTP 403 Forbidden | Update yt-dlp (`pip install -U yt-dlp`) or refresh cookies |
+| HTTP 429           | Reduce concurrency or use proxies                          |
+| Empty output       | Check connectivity and dependencies                        |
+| Lyrics missing     | Track may not exist in lyric databases                     |
 
 ---
 

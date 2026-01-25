@@ -39,7 +39,106 @@ class AudioDownloader:
         self.analyzer = AudioAnalyzer(logger)
         self.proxy_manager = proxy_manager
 
-    # download method unchanged
+    def download(self, search_result: SearchResult, track: TrackMetadata, check_quit=None, subfolder: str = "") -> DownloadResult:
+        """
+        Descarga, convierte y etiqueta una canción.
+        Retorna DownloadResult.
+        """
+        raw_path = None
+        try:
+            # 1. Determinar rutas de salida
+            hq_folder = Path(self.cfg.OUTPUT_FOLDER_HQ)
+            mobile_folder = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
+            
+            if subfolder:
+                hq_folder = hq_folder / subfolder
+                mobile_folder = mobile_folder / subfolder
+            
+            quality_mode = self.cfg.MODE
+            needed_hq = quality_mode in [QualityMode.HQ_ONLY, QualityMode.BOTH]
+            needed_mobile = quality_mode in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]
+
+            if needed_hq:
+                hq_folder.mkdir(parents=True, exist_ok=True)
+            if needed_mobile:
+                mobile_folder.mkdir(parents=True, exist_ok=True)
+
+            filename = f"{track.safe_filename}.mp3"
+            hq_path = hq_folder / filename
+            mobile_path = mobile_folder / filename
+
+            # 2. Verificar existencia (Skip si ya existe en la calidad solicitada)
+            hq_exists = hq_path.exists() and hq_path.stat().st_size > 0
+            mobile_exists = mobile_path.exists() and mobile_path.stat().st_size > 0
+
+            todo_hq = needed_hq and not hq_exists
+            todo_mob = needed_mobile and not mobile_exists
+
+            if not todo_hq and not todo_mob:
+                return DownloadResult(True, 0, skipped=True)
+
+            # 3. Obtener URL de descarga e iniciar descarga RAW
+            url = search_result.url if search_result else None
+            if not url:
+                url = f"ytsearch1:{track.artist} - {track.title} audio"
+            
+            self.log.info(f"Downloading: {track.title}")
+            raw_path = self._download_raw(url, track.track_id)
+
+            if not raw_path or not raw_path.exists():
+                return DownloadResult(False, 0, "Download failed (no file)")
+
+            if check_quit and check_quit():
+                return DownloadResult(False, 0, "Cancelled", skipped=True)
+
+            # 4. Análisis Espectral (Anti-Fake HQ)
+            fake_hq = False
+            if self.cfg.SPECTRAL_ANALYSIS and todo_hq:
+                is_hq = self.analyzer.analyze_integrity(raw_path, cutoff_hz=self.cfg.SPECTRAL_CUTOFF)
+                if not is_hq:
+                    self.log.warning(f"Fake HQ detected for {track.title}")
+                    fake_hq = True
+
+            total_bytes = 0
+            success = True
+
+            # 5. Transcodificar HQ
+            if todo_hq:
+                self.log.debug(f"Transcoding HQ ({self.cfg.QUALITY_HQ_BITRATE}k)...")
+                if self._transcode(raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE):
+                    self._inject_metadata(hq_path, track)
+                    total_bytes += hq_path.stat().st_size
+                else:
+                    success = False
+
+            if check_quit and check_quit():
+                return DownloadResult(False, 0, "Cancelled", skipped=True)
+
+            # 6. Transcodificar Mobile
+            if todo_mob:
+                self.log.debug(f"Transcoding Mobile ({self.cfg.QUALITY_MOBILE_BITRATE}k)...")
+                if self._transcode(raw_path, mobile_path, self.cfg.QUALITY_MOBILE_BITRATE):
+                    self._inject_metadata(mobile_path, track)
+                    total_bytes += mobile_path.stat().st_size
+                else:
+                    success = False
+
+            if success:
+                return DownloadResult(True, total_bytes, fake_hq=fake_hq)
+            else:
+                return DownloadResult(False, 0, "Transcode failed")
+
+        except Exception as e:
+            self.log.error(f"Download error {track.title}: {e}")
+            return DownloadResult(False, 0, f"Error: {str(e)}")
+        
+        finally:
+            # 7. Limpieza
+            if raw_path and raw_path.exists():
+                try:
+                    os.remove(raw_path)
+                except:
+                    pass
 
     def _download_cover(self, url: str) -> Optional[bytes]:
         """Descarga imagen de portada del álbum"""
@@ -57,7 +156,6 @@ class AudioDownloader:
             self.log.debug(f"Error descargando cover: {e}")
         return None
     
-    # _inject_metadata method unchanged until _download_raw
     def _inject_metadata(self, file_path: Path, track: TrackMetadata) -> bool:
         """Inyecta metadatos ID3 al archivo MP3"""
         try:
@@ -115,7 +213,6 @@ class AudioDownloader:
             audio.save(v2_version=3)
             self.log.debug(f"Metadatos inyectados: {track.title}")
             return True
-
         except Exception as e:
             self.log.debug(f"Error inyectando metadatos: {e}")
             return False
@@ -133,10 +230,28 @@ class AudioDownloader:
             "noprogress": True,
             "socket_timeout": 15,
             "retries": 3,
-            "fragment_retries": 3,
+            "fragment_retries": 10,  # Increase fragment retries
             "skip_unavailable_fragments": True,
-            "http_headers": {"User-Agent": random.choice(USER_AGENTS)},
+            "geo_bypass": True,
+            "http_headers": {
+                "User-Agent": random.choice(USER_AGENTS),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-us,en;q=0.5",
+                "Sec-Fetch-Mode": "navigate",
+            },
+            # Common fix for 403 Forbidden
+            "extractor_args": {
+                "youtube": {
+                    "player_client": ["android", "web"],
+                    "po_token": ["web+web_embedded_player"],
+                }
+            },
         }
+        
+        if self.cfg.DEBUG_MODE:
+            opts["quiet"] = False
+            opts["no_warnings"] = False
+            opts["verbose"] = True
 
         if self.proxy_manager:
             proxy = self.proxy_manager.get_proxy()
@@ -147,12 +262,46 @@ class AudioDownloader:
         if self._cookies_valid:
             opts["cookiefile"] = self.cfg.COOKIES_FILE
 
+        # Force logging to file to inspect later
+        class FileLogger:
+            def debug(self, msg):
+                with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
+                    f.write(f"[DEBUG] {msg}\n")
+            def warning(self, msg):
+                with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
+                    f.write(f"[WARNING] {msg}\n")
+            def error(self, msg):
+                with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
+                    f.write(f"[ERROR] {msg}\n")
+        
+        opts["logger"] = FileLogger()
+
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 if not info:
                     raise NotFoundError("yt-dlp no retornó información")
-                return Path(ydl.prepare_filename(info))
+                
+                final_path = Path(ydl.prepare_filename(info))
+                
+                if not final_path.exists():
+                    # Debug: List what IS there
+                    try:
+                        files = list(temp_dir.glob("*"))
+                        self.log.debug(f"MISSING: {final_path}")
+                        self.log.debug(f"FOUND in {temp_dir}: {[f.name for f in files]}")
+                        
+                        # Emergency fallback: if there's only one file that overlaps in name, grab it
+                        # Or if prepare_filename predicted wrong extension
+                        stem = final_path.stem
+                        for f in files:
+                            if f.stem == stem:
+                                self.log.debug(f"Recovered file with different ext: {f}")
+                                return f
+                    except:
+                        pass
+                
+                return final_path
 
         except yt_dlp.utils.DownloadError as e:
             error_str = str(e).lower()
@@ -170,7 +319,7 @@ class AudioDownloader:
             elif "sign in" in error_str or "age" in error_str:
                 raise FatalError(f"Requiere login: {str(e)[:50]}")
             else:
-                raise RecoverableError(f"Error descarga: {str(e)[:50]}")
+                raise RecoverableError(f"Error descarga: {str(e)}")
 
     def _transcode(self, input_path: Path, output_path: Path, bitrate: str) -> bool:
         """

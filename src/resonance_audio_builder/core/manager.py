@@ -5,6 +5,7 @@ import time
 import traceback
 import csv
 from datetime import datetime
+from pathlib import Path
 from typing import List, Tuple
 
 from rich.panel import Panel
@@ -203,27 +204,8 @@ class DownloadManager:
                     finally:
                         self.tracker.remove_task(task_id)
 
-                    # 3. Metadatos (Siempre intentar escribir, incluso si ya estaba descargado)
-                    folders = []
-                    
-                    # Logic duplicated from downloader, ideally downloader returns paths.
-                    # But for now we reconstruct:
-                    root_hq = Path(self.cfg.OUTPUT_FOLDER_HQ)
-                    root_mob = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
-                    
-                    if subfolder:
-                        root_hq /= subfolder
-                        root_mob /= subfolder
-                    
-                    if self.cfg.MODE in [QualityMode.HQ_ONLY, QualityMode.BOTH]:
-                        folders.append(root_hq)
-                    if self.cfg.MODE in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]:
-                        folders.append(root_mob)
-
-                    for folder in folders:
-                        mp3_path = folder / f"{track.safe_filename}.mp3"
-                        if mp3_path.exists():
-                            self.metadata_writer.write(mp3_path, track)
+                    if not result.success:
+                        raise RecoverableError(result.error or "Unknown download error")
 
                     # Éxito
                     status = "skip" if result.skipped else "ok"
