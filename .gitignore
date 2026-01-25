@@ -1,20 +1,21 @@
-# Archivos de descarga
-Audio_Mobile/
-Audio_HQ/
-
-# Archivos de estado
+# Archivos de estado y cache
 progress.json
 youtube_cache.json
 cache.db
-Failed_songs.txt
-Failed_songs.csv
 history.json
 playlist.m3u
+Failed_songs.txt
+Failed_songs.csv
 
-# Datos sensibles
+# Datos sensibles y descargas
 cookies.txt
 *.csv
-!requirements.txt
+Audio_Mobile/
+Audio_HQ/
+temp_downloads/
+ytdlp_raw.log
+ytdlp_raw.log.*
+*.log
 
 # Python
 __pycache__/
