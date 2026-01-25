@@ -236,6 +236,14 @@ While tools like **spotDL** or **SpotDown** are excellent for quickly mirroring 
 - **Loudness Normalization**: Uses professional **EBU R128** standards so your entire library sounds consistent.
 - **OpSec & Stability**: Advanced proxy management and custom yt-dlp configurations to handle recent platform changes more robustly.
 
+**Q: Can I download thousands of songs at once?**
+Yes, Resonance is designed for **large-scale library building**:
+
+- **Persistent Progress**: It saves checkpoints every 5 songs. If you close the app or lose connection, it resumes exactly where it left off.
+- **SQLite Caching**: Search results are stored in a database, so re-running a list (or retrying failed items) is nearly instant.
+- **Dynamic Rate Limiting**: Avoids being banned by automatically pausing and using randomized delays.
+- **Efficient Multithreading**: Processes multiple tracks concurrently to maximize your bandwidth.
+
 ---
 
 ## Contributing
