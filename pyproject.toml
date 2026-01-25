@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "resonance-audio-builder"
-version = "6.0.0"
+version = "7.0.0"
 description = "Personal audio library builder with metadata and loudness normalization"
 readme = "README.md"
 license = {text = "MIT"}

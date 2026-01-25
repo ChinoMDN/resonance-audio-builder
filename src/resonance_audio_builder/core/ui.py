@@ -22,7 +22,7 @@ def print_header():
     clear_screen()
     grid = Table.grid(expand=True)
     grid.add_column(justify="center", ratio=1)
-    grid.add_row(Panel("[bold cyan]Resonance Music Downloader v6.0[/bold cyan]", border_style="cyan", padding=(1, 2)))
+    grid.add_row(Panel("[bold cyan]Resonance Music Downloader v7.0[/bold cyan]", border_style="cyan", padding=(1, 2)))
 
     # OpSec Warning
     grid.add_row(
