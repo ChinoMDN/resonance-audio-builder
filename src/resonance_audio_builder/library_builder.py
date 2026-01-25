@@ -988,6 +988,8 @@ class AudioDownloader:
                 if not out_path.exists() or out_path.stat().st_size == 0:
                     self.log.debug(f"Transcodificando a {bitrate}kbps...")
                     if self._transcode(raw_path, out_path, bitrate):
+                        # Inyectar metadatos ID3 después de transcodificar
+                        self._inject_metadata(out_path, track)
                         total_bytes += out_path.stat().st_size
                     else:
                         raise TranscodeError(f"FFmpeg falló para {bitrate}kbps")
@@ -1001,6 +1003,82 @@ class AudioDownloader:
                     raw_path.unlink()
                 except:
                     pass
+
+    def _download_cover(self, url: str) -> Optional[bytes]:
+        """Descarga imagen de portada del álbum"""
+        if not url or len(url) < 10:
+            return None
+
+        try:
+            headers = {"User-Agent": random.choice(USER_AGENTS)}
+            response = requests.get(url, timeout=10, headers=headers)
+            if response.status_code == 200:
+                return response.content
+        except Exception as e:
+            self.log.debug(f"Error descargando cover: {e}")
+        return None
+
+    def _inject_metadata(self, file_path: Path, track: TrackMetadata) -> bool:
+        """Inyecta metadatos ID3 al archivo MP3"""
+        try:
+            # Crear/cargar tags ID3
+            try:
+                audio = MP3(str(file_path), ID3=ID3)
+            except Exception:
+                audio = MP3(str(file_path))
+
+            # Eliminar tags existentes
+            try:
+                audio.delete()
+            except Exception:
+                pass
+
+            # Recargar y crear tags nuevos
+            audio = MP3(str(file_path))
+            audio.add_tags()
+
+            # Metadatos básicos
+            if track.title:
+                audio.tags.add(TIT2(encoding=3, text=track.title))
+            if track.artist:
+                audio.tags.add(TPE1(encoding=3, text=track.artist))
+            if track.album:
+                audio.tags.add(TALB(encoding=3, text=track.album))
+            if track.album_artist:
+                audio.tags.add(TPE2(encoding=3, text=track.album_artist))
+
+            # Año (extraer de release_date)
+            if track.release_date and len(track.release_date) >= 4:
+                audio.tags.add(TYER(encoding=3, text=track.release_date[:4]))
+
+            # Número de pista y disco
+            if track.track_number:
+                audio.tags.add(TRCK(encoding=3, text=track.track_number))
+            if track.disc_number:
+                audio.tags.add(TPOS(encoding=3, text=track.disc_number))
+
+            # ISRC
+            if track.isrc:
+                audio.tags.add(TSRC(encoding=3, text=track.isrc))
+
+            # Comentario con URI de Spotify
+            if track.spotify_uri:
+                audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {track.spotify_uri}"))
+
+            # Carátula del álbum
+            if track.cover_url:
+                cover_data = self._download_cover(track.cover_url)
+                if cover_data:
+                    audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=cover_data))
+                    self.log.debug("Cover art embebido")
+
+            audio.save(v2_version=3)
+            self.log.debug(f"Metadatos inyectados: {track.title}")
+            return True
+
+        except Exception as e:
+            self.log.debug(f"Error inyectando metadatos: {e}")
+            return False
 
     def _download_raw(self, url: str, name: str) -> Path:
         """Descarga audio raw de YouTube"""
