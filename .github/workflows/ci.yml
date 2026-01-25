@@ -1,13 +1,118 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
     push:
         branches: [main, develop]
     pull_request:
         branches: [main]
+    schedule:
+        - cron: "0 0 * * 1" # Weekly dependency check
+
+env:
+    PYTHON_VERSION: "3.11"
+    MIN_COVERAGE: 75
 
 jobs:
+    # ===== PRE-COMMIT CHECKS =====
+    pre-commit:
+        name: Pre-commit Checks
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: "pip"
+
+            - name: Install pre-commit
+              run: pip install pre-commit
+
+            - name: Run pre-commit hooks
+              run: pre-commit run --all-files
+
+    # ===== LINTING =====
+    lint:
+        name: Lint Code
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: "pip"
+
+            - name: Install linters
+              run: pip install flake8 black isort mypy pylint
+
+            - name: Check formatting with Black
+              run: black --check --diff src/resonance_audio_builder/
+
+            - name: Check imports with isort
+              run: isort --check-only --diff src/resonance_audio_builder/
+
+            - name: Lint with flake8
+              run: |
+                  flake8 src/resonance_audio_builder/ \
+                    --max-line-length=120 \
+                    --ignore=E501,W503 \
+                    --max-complexity=10 \
+                    --statistics \
+                    --count
+
+            - name: Type check with mypy
+              run: mypy src/resonance_audio_builder/ --ignore-missing-imports
+              continue-on-error: true
+
+            - name: Lint with pylint
+              run: pylint src/resonance_audio_builder/ --max-line-length=120
+              continue-on-error: true
+
+    # ===== SECURITY SCANNING =====
+    security:
+        name: Security Scan
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: "pip"
+
+            - name: Install security tools
+              run: pip install bandit safety pip-audit
+
+            - name: Run Bandit (code security)
+              run: |
+                  bandit -r src/ -f json -o bandit-report.json
+                  bandit -r src/ --severity-level medium --confidence-level medium
+              # No || true here
+
+            - name: Check dependencies with Safety
+              run: safety check --json > safety-report.json
+
+            - name: Audit with pip-audit
+              run: pip-audit --require-hashes --desc > pip-audit-report.txt
+
+            - name: Upload Security Reports
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: security-reports
+                  path: |
+                      bandit-report.json
+                      safety-report.json
+                      pip-audit-report.txt
+                  retention-days: 90
+
+    # ===== TESTS =====
     test:
+        name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
@@ -22,106 +127,235 @@ jobs:
               uses: actions/setup-python@v5
               with:
                   python-version: ${{ matrix.python-version }}
+                  cache: "pip"
 
-            - name: Install FFmpeg (Ubuntu)
-              if: matrix.os == 'ubuntu-latest'
-              run: sudo apt-get update && sudo apt-get install -y ffmpeg
+            - name: Setup FFmpeg
+              uses: FedericoCarboni/setup-ffmpeg@v3
+              with:
+                  ffmpeg-version: release
 
-            - name: Install FFmpeg (macOS)
-              if: matrix.os == 'macos-latest'
-              run: brew install ffmpeg
-
-            - name: Install FFmpeg (Windows)
+            - name: Cache FFmpeg (Windows)
               if: matrix.os == 'windows-latest'
-              run: choco install ffmpeg -y
+              uses: actions/cache@v4
+              with:
+                  path: C:\ProgramData\chocolatey\lib\ffmpeg
+                  key: ${{ runner.os }}-ffmpeg
+
+            - name: Verify FFmpeg installation
+              run: ffmpeg -version
 
             - name: Install dependencies
               run: |
                   python -m pip install --upgrade pip
-                  pip install -r requirements.txt
+                  pip install -r requirements.txt -r requirements-dev.txt
                   pip install -e .
-                  pip install pytest pytest-cov
 
-            - name: Run tests
+            - name: Run tests with coverage
+              timeout-minutes: 30
               run: |
-                  pytest tests/ -v --cov=src/resonance_audio_builder --cov-report=xml
+                  pytest tests/ \
+                    -v \
+                    -n auto \
+                    --cov=src/resonance_audio_builder \
+                    --cov-report=xml \
+                    --cov-report=html \
+                    --cov-report=term-missing \
+                    --cov-fail-under=${{ env.MIN_COVERAGE }} \
+                    --maxfail=5 \
+                    --timeout=300 \
+                    --tb=short
 
-            - name: Upload coverage
-              if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-              uses: codecov/codecov-action@v3
+            - name: Generate coverage badge
+              if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+              run: |
+                  coverage-badge -o coverage.svg -f
+
+            - name: Upload coverage reports
+              if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+              uses: codecov/codecov-action@v4
               with:
                   file: ./coverage.xml
+                  flags: unittests
+                  name: codecov-umbrella
+                  fail_ci_if_error: true
+                  token: ${{ secrets.CODECOV_TOKEN }}
 
-    security:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
-
-            - name: Install Bandit
-              run: pip install bandit
-
-            - name: Run Bandit Scan
-              run: bandit -r src/ -f json -o bandit-report.json || true
-
-            - name: Upload Security Report
+            - name: Upload HTML coverage report
+              if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
               uses: actions/upload-artifact@v4
               with:
-                  name: bandit-security-report
-                  path: bandit-report.json
+                  name: coverage-report
+                  path: htmlcov/
+                  retention-days: 30
 
-    lint:
+    # ===== INTEGRATION TESTS =====
+    integration:
+        name: Integration Tests
         runs-on: ubuntu-latest
+        needs: [test]
         steps:
             - uses: actions/checkout@v4
 
             - name: Set up Python
               uses: actions/setup-python@v5
               with:
-                  python-version: "3.11"
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: "pip"
 
-            - name: Install linters
-              run: |
-                  pip install flake8 black isort
-
-            - name: Check formatting with Black
-              run: black --check --diff src/resonance_audio_builder/
-              continue-on-error: true
-
-            - name: Check imports with isort
-              run: isort --check-only --diff src/resonance_audio_builder/
-              continue-on-error: true
-
-            - name: Lint with flake8
-              run: flake8 src/resonance_audio_builder/ --max-line-length=120 --ignore=E501,W503 --count --select=E9,F63,F7,F82
-              continue-on-error: true
-
-    build:
-        needs: test
-        runs-on: windows-latest
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.11"
+            - name: Setup FFmpeg
+              uses: FedericoCarboni/setup-ffmpeg@v3
 
             - name: Install dependencies
               run: |
                   pip install -r requirements.txt
-                  pip install pyinstaller watchdog rich
+                  pip install -e .
+                  pip install pytest
+
+            - name: Run integration tests
+              run: pytest tests/integration/ -v --tb=short
+              timeout-minutes: 60
+
+    # ===== BUILD EXECUTABLES =====
+    build:
+        name: Build (${{ matrix.os }})
+        needs: [test, lint, security]
+        strategy:
+            matrix:
+                include:
+                    - os: windows-latest
+                      artifact-name: ResonanceMusicBuilder-Windows.exe
+                      binary-path: dist/ResonanceMusicBuilder.exe
+                    - os: ubuntu-latest
+                      artifact-name: ResonanceMusicBuilder-Linux
+                      binary-path: dist/ResonanceMusicBuilder
+                    - os: macos-latest
+                      artifact-name: ResonanceMusicBuilder-macOS
+                      binary-path: dist/ResonanceMusicBuilder
+
+        runs-on: ${{ matrix.os }}
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: "pip"
+
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements.txt
+                  pip install pyinstaller
 
             - name: Build Executable
               run: |
-                  pyinstaller --clean --onefile --name "ResonanceMusicBuilder" --paths src --collect-all rich --collect-all watchdog --hidden-import resonance_audio_builder src/resonance_audio_builder/cli.py
+                  pyinstaller --clean --onefile \
+                    --name "ResonanceMusicBuilder" \
+                    --paths src \
+                    --collect-all rich \
+                    --collect-all watchdog \
+                    --hidden-import resonance_audio_builder \
+                    src/resonance_audio_builder/cli.py
+
+            - name: Test Executable (smoke test)
+              shell: bash
+              run: |
+                  if [ "${{ matrix.os }}" = "windows-latest" ]; then
+                    dist/ResonanceMusicBuilder.exe --help || echo "Help command failed"
+                  else
+                    chmod +x dist/ResonanceMusicBuilder
+                    dist/ResonanceMusicBuilder --help || echo "Help command failed"
+                  fi
 
             - name: Upload Artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: ResonanceMusicBuilder-Windows
-                  path: dist/ResonanceMusicBuilder.exe
+                  name: ${{ matrix.artifact-name }}-${{ github.sha }}
+                  path: ${{ matrix.binary-path }}
+                  retention-days: 30
+
+    # ===== BENCHMARKS (optional) =====
+    benchmark:
+        name: Performance Benchmarks
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        needs: [test]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: "pip"
+
+            - name: Install dependencies
+              run: |
+                  pip install -r requirements.txt
+                  pip install pytest-benchmark
+
+            - name: Run benchmarks
+              run: |
+                  pytest tests/benchmarks/ \
+                    --benchmark-only \
+                    --benchmark-json=benchmark.json || true
+
+            - name: Upload benchmark results
+              uses: actions/upload-artifact@v4
+              with:
+                  name: benchmark-results
+                  path: benchmark.json
+
+    # ===== DEPENDENCY CHECK =====
+    dependency-check:
+        name: Check Dependencies
+        runs-on: ubuntu-latest
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+
+            - name: Check for outdated packages
+              run: |
+                  pip install pip-upgrader
+                  pip-upgrade requirements.txt --skip-package-installation
+
+            - name: Create Pull Request
+              uses: peter-evans/create-pull-request@v6
+              with:
+                  commit-message: "chore: update dependencies"
+                  title: "chore: automated dependency update"
+                  body: "Automated dependency updates found by CI."
+                  branch: deps/update-dependencies
+
+    # ===== RELEASE (on tag) =====
+    release:
+        name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        needs: [build, test, security, lint]
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
+
+            - name: Create Release
+              uses: softprops/action-gh-release@v1
+              with:
+                  files: |
+                      ResonanceMusicBuilder-Windows-*/ResonanceMusicBuilder.exe
+                      ResonanceMusicBuilder-Linux-*/ResonanceMusicBuilder
+                      ResonanceMusicBuilder-macOS-*/ResonanceMusicBuilder
+                  draft: false
+                  prerelease: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

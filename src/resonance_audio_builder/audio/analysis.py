@@ -66,7 +66,7 @@ class AudioAnalyzer:
                 
                 self.log.debug(f"HF RMS Level (> {cutoff_hz}Hz): {level_db} dB")
                 
-                if level_db == float("-inf") or level_db < -85.0:
+                if level_db == float("-inf") or level_db < -75.0:
                     return False  # Fake HQ
                 else:
                     return True   # Genuine HQ

@@ -1,6 +1,6 @@
 import os
+import asyncio
 import queue
-import threading
 import time
 import traceback
 import csv
@@ -14,9 +14,9 @@ from rich.prompt import Confirm
 
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
-from resonance_audio_builder.core.state import RichProgressTracker
+from resonance_audio_builder.core.state import ProgressDB
+from resonance_audio_builder.core.ui import RichUI, print_header, clear_screen, format_time, format_size, console
 from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
-from resonance_audio_builder.core.ui import print_header, clear_screen, format_time, format_size, console
 from resonance_audio_builder.core.utils import save_history, export_m3u
 from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.audio.metadata import TrackMetadata
@@ -24,37 +24,37 @@ from resonance_audio_builder.audio.youtube import YouTubeSearcher
 from resonance_audio_builder.audio.downloader import AudioDownloader
 from resonance_audio_builder.audio.tagging import MetadataWriter
 from resonance_audio_builder.network.cache import CacheManager
-from resonance_audio_builder.network.proxies import ProxyManager
+from resonance_audio_builder.network.proxies import SmartProxyManager
 
 class DownloadManager:
-    """Orquestador principal de descargas"""
+    """Orquestador principal de descargas (Async)"""
 
     def __init__(self, config: Config, cache_manager: CacheManager):
         self.cfg = config
         self.log = Logger(config.DEBUG_MODE)
         self.cache = cache_manager
-        self.tracker = RichProgressTracker(self.cfg)
-        self.log.set_tracker(self.tracker)  # Link logger to tracker UI
         
-        # Init Proxy Manager
-        self.proxy_manager = ProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
+        self.state = ProgressDB(config)
+        self.ui = RichUI(config)
+        self.log.set_tracker(self.ui)
+        
+        # Init Proxy Manager (Async compliant)
+        self.proxy_manager = SmartProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
         
         self.downloader = AudioDownloader(self.cfg, self.log, self.proxy_manager)
         self.searcher = YouTubeSearcher(self.cfg, self.log, self.cache, self.proxy_manager)
         self.metadata_writer = MetadataWriter(self.log)
         self.keyboard = KeyboardController(self.log)
 
-        # Limpiar terminal al inicio
         console.clear()
-        self.queue: queue.Queue = queue.Queue()
+        self.queue = asyncio.Queue()
         self.failed_tracks: List[Tuple[TrackMetadata, str]] = []
-        self._print_lock = threading.Lock()
 
-    def run(self, tracks: List[TrackMetadata]):
-        """Ejecuta la descarga de todas las canciones"""
+    async def run(self, tracks: List[TrackMetadata]):
+        """Ejecuta la descarga de todas las canciones (Async)"""
 
         # Filtrar ya procesadas
-        pending = [t for t in tracks if not self.tracker.is_done(t.track_id)]
+        pending = [t for t in tracks if not self.state.is_done(t.track_id)]
 
         if not pending:
             print("\n✓ ¡Todas las canciones ya están descargadas!")
@@ -63,35 +63,30 @@ class DownloadManager:
         clear_screen()
         print_header()
 
-        self.tracker.total_pending = len(pending)
-        self.tracker.reset_stats()
-
-        # Mostrar info de canciones
+        # Mostrar queue
         table = Table(title=f"Download Queue ({len(pending)} pending)", expand=True, box=None)
         table.add_column("Track", style="bold white")
         table.add_column("Artist", style="cyan")
         table.add_column("Status", justify="right")
 
-        # Mostrar primero las ya descargadas (primeras 10)
         done_count = 0
         for t in tracks:
-            if self.tracker.is_done(t.track_id):
+            if self.state.is_done(t.track_id):
                 if done_count < 10:
                     table.add_row(t.title, t.artist, "[green]✔ Downloaded[/green]")
                 done_count += 1
-
+        
         if done_count > 10:
             table.add_row("...", "...", f"[dim]+ {done_count - 10} more done[/dim]")
 
-        # Mostrar las pendientes (primeras 20)
         pending_count = 0
         for t in pending:
             if pending_count < 20:
                 table.add_row(t.title, t.artist, "[yellow]⏳ Pending[/yellow]")
             pending_count += 1
-
+            
         if pending_count > 20:
-            table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
+             table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
 
         console.print(Panel(table, border_style="blue"))
 
@@ -113,167 +108,179 @@ class DownloadManager:
         print()
 
         # Start Live Display
-        self.tracker.start(len(pending))
+        self.ui.start(len(pending))
 
-        # Llenar cola
+        # Fill Queue
+        self.log.debug(f"filling queue with {len(pending)} items")
         for t in pending:
-            self.queue.put(t)
+            await self.queue.put(t)
+        self.log.debug("queue filled")
 
-        # Iniciar keyboard listener
+        # Start keyboard listener (Thread)
         self.keyboard.start()
 
-        # Iniciar workers
+        # Start Workers
+        self.log.debug(f"starting {self.cfg.MAX_WORKERS} workers")
         workers = []
         for i in range(self.cfg.MAX_WORKERS):
-            t = threading.Thread(target=self._worker, daemon=True)
-            t.start()
-            workers.append(t)
+            task = asyncio.create_task(self._worker())
+            workers.append(task)
+        self.log.debug("workers started")
 
-        # Esperar finalización
+        # Wait for queue to empty
         try:
-            while not self.queue.empty() and not self.keyboard.should_quit():
-                time.sleep(0.5)
+            # Monitor queue and keyboard
+            while not self.queue.empty():
+                if self.keyboard.should_quit():
+                    break
+                
+                # Check if all workers died? No, they loop until cancelled or queue empty check inside
+                # Actually _worker pops from queue.
+                # We can just join the queue, but we need to check keyboard interrupt.
+                # So we poll queue empty + keyboard
+                await asyncio.sleep(0.5)
+            
+            # Wait for remaining tasks in queue (if not quitting)
+            if not self.keyboard.should_quit():
+                await self.queue.join()
 
-            # Vaciar cola si salimos prematuramente
-            if self.keyboard.should_quit():
-                while not self.queue.empty():
-                    try:
-                        self.queue.get_nowait()
-                        self.queue.task_done()
-                    except:
-                        break
-
-            self.queue.join()
-
-        except KeyboardInterrupt:
-            # Quit handled by signal in App or here
-            self.keyboard.quit_event.set()
-
+        except asyncio.CancelledError:
+             pass
         finally:
+            # Setup for clean exit
+            for w in workers:
+                w.cancel()
+            
+            # Drain queue if quitting
+            while not self.queue.empty():
+                try: self.queue.get_nowait(); self.queue.task_done()
+                except: break
+
             self.keyboard.stop()
-            self.tracker.stop()  # Stop Live display
-            self.tracker.save()
+            self.ui.stop()
             self._save_failed()
             self._print_summary()
 
-    def _worker(self):
-        """Thread worker de descarga"""
-        while not self.keyboard.should_quit():
+    async def _worker(self):
+        """Async worker"""
+        self.log.debug("worker started")
+        while True:
             try:
-                track = self.queue.get(timeout=1)
-            except queue.Empty:
-                continue
-
-            if track is None:
-                self.queue.task_done()
+                # Get track without waiting too long so we can check cancellation
+                track = await self.queue.get()
+                self.log.debug(f"worker got track: {track.title}")
+            except asyncio.CancelledError:
+                self.log.debug("worker cancelled")
                 break
+            
+            task_id = None
+            try:
+                # Check Pause
+                while self.keyboard.is_paused():
+                    await asyncio.sleep(0.5)
 
-            # Esperar si está pausado
-            self.keyboard.wait_if_paused()
-
-            # Verificar skip
-            if self.keyboard.should_skip():
-                self.tracker.mark(track.track_id, "skip")
-                self.queue.task_done()
-                continue
-
-            # Procesar canción
-            attempt = 0
-            success = False
-            last_error = ""
-
-            while attempt < self.cfg.MAX_RETRIES and not success:
                 if self.keyboard.should_quit():
-                    break
+                    self.queue.task_done()
+                    return
 
-                attempt += 1
+                if self.keyboard.should_skip():
+                    self.state.mark(track, "skip")
+                    self.ui.update_main_progress(1)
+                    self.queue.task_done()
+                    continue
 
-                try:
-                    # 1. Buscar
-                    search_result = self.searcher.search(track)
+                attempt = 0
+                success = False
+                last_error = ""
 
-                    # 2. Descargar
-                    task_id = self.tracker.add_download_task(track.title)
-                    self.tracker.active_downloads.add_row(f"{track.artist} - {track.title}", "Downloading...")
+                while attempt < self.cfg.MAX_RETRIES and not success:
+                    if self.keyboard.should_quit(): break
+                    
+                    # Create task strictly before starting attempt to show status
+                    if not task_id:
+                        task_id = self.ui.add_download_task(track.artist, track.title)
 
-                    # Obtener subcarpeta si existe (inyectada por Builder)
-                    subfolder = getattr(track, "playlist_subfolder", "")
+                    attempt += 1
 
                     try:
-                        result = self.downloader.download(search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder)
-                    finally:
-                        self.tracker.remove_task(task_id)
+                        # 1. Search (Async)
+                        self.ui.update_task_status(task_id, "[cyan]Searching...[/cyan]")
+                        self.log.debug(f"starting search for {track.title}")
+                        search_result = await self.searcher.search(track)
+                        self.log.debug(f"search done for {track.title}")
 
-                    if not result.success:
-                        raise RecoverableError(result.error or "Unknown download error")
+                        # 2. Download (Async)
+                        self.ui.update_task_status(task_id, "[blue]Downloading...[/blue]")
+                        subfolder = getattr(track, "playlist_subfolder", "")
 
-                    # Éxito
-                    status = "skip" if result.skipped else "ok"
-                    self.tracker.mark(track.track_id, status, result.bytes)
-                    success = True
+                        result = await self.downloader.download(search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder)
+                        # Download finished
 
-                except FatalError as e:
-                    last_error = str(e)
-                    self.log.debug(f"Error fatal: {e}")
-                    break  # No reintentar errores fatales
+                        if not result.success:
+                             raise RecoverableError(result.error or "Unknown download error")
 
-                except RecoverableError as e:
-                    last_error = str(e)
-                    if attempt < self.cfg.MAX_RETRIES:
-                        self.log.debug(f"Reintento {attempt}/{self.cfg.MAX_RETRIES}: {e}")
-                        time.sleep(2 * attempt)  # Backoff exponencial
+                        status_str = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
+                        self.ui.update_task_status(task_id, status_str)
+                        self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
+                        self.ui.update_main_progress(1)
+                        success = True
 
-                except Exception as e:
-                    last_error = str(e)
-                    self.log.debug(f"Error inesperado: {traceback.format_exc()}")
-                    break
+                    except FatalError as e:
+                        last_error = str(e)
+                        self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+                        self.log.debug(f"Error fatal: {e}")
+                        break
 
-            if not success and not self.keyboard.should_quit():
-                self.tracker.mark(track.track_id, "err")
-                self.failed_tracks.append((track, last_error))
+                    except RecoverableError as e:
+                        last_error = str(e)
+                        self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
+                        if attempt < self.cfg.MAX_RETRIES:
+                             self.log.debug(f"Reintento {attempt}: {e}")
+                             await asyncio.sleep(2 * attempt)
 
-            self.queue.task_done()
+                    except Exception as e:
+                        last_error = str(e)
+                        self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+                        self.log.debug(f"Error inesperado: {traceback.format_exc()}")
+                        break
+                
+                if not success and not self.keyboard.should_quit():
+                    self.ui.update_task_status(task_id, f"[red]Failed: {last_error}[/red]")
+                    self.state.mark(track, "error", error=last_error)
+                    self.ui.update_main_progress(1)
+                    self.failed_tracks.append((track, last_error))
 
-            # Guardar checkpoint periódicamente
-            processed = self.tracker.ok_count + self.tracker.err_count + self.tracker.skip_count
-            if processed % 5 == 0:
-                self.tracker.save()
+            finally:
+                if task_id:
+                    # Delay removal so user can see result (Success/Fail)
+                    await asyncio.sleep(2.0)
+                    self.ui.remove_task(task_id)
+                self.queue.task_done()
 
     def _save_failed(self):
-        """Guarda canciones fallidas"""
-        if not self.failed_tracks:
-            return
-
-        # TXT legible
-        with open(self.cfg.ERROR_FILE, "w", encoding="utf-8") as f:
-            f.write(f"CANCIONES FALLIDAS - {datetime.now()}\n")
-            f.write("=" * 60 + "\n\n")
-            for track, error in self.failed_tracks:
-                f.write(f"• {track.artist} - {track.title}\n")
-                f.write(f"  Error: {error}\n\n")
-
-        # CSV para reintentar
-        with open(self.cfg.ERROR_CSV, "w", encoding="utf-8", newline="") as f:
-            if self.failed_tracks:
-                sample = self.failed_tracks[0][0].raw_data
-                fieldnames = list(sample.keys())
-                writer = csv.DictWriter(f, fieldnames=fieldnames)
-                writer.writeheader()
-                for track, _ in self.failed_tracks:
-                    writer.writerow(track.raw_data)
+        if not self.failed_tracks: return
+        try:
+            with open(self.cfg.ERROR_FILE, "w", encoding="utf-8") as f:
+                f.write(f"CANCIONES FALLIDAS - {datetime.now()}\n\n")
+                for track, error in self.failed_tracks:
+                    f.write(f"• {track.artist} - {track.title}\n  Error: {error}\n\n")
+            
+            with open(self.cfg.ERROR_CSV, "w", encoding="utf-8", newline="") as f:
+                if self.failed_tracks:
+                    writer = csv.DictWriter(f, fieldnames=list(self.failed_tracks[0][0].raw_data.keys()))
+                    writer.writeheader()
+                    for track, _ in self.failed_tracks:
+                        writer.writerow(track.raw_data)
+        except: pass
 
     def _print_summary(self):
         """Imprime resumen final con Rich"""
-        elapsed = time.time() - self.tracker.start_time
-
+        # Calcular duración aproximada si start_time no es accesible
+        # (Idealmente RichUI podría trackear start_time o lo pasamos)
+        
+        stats = self.state.get_stats()
         console.print("\n")
-        console.print(
-            Panel(
-                self.tracker.get_stats_table(),
-                title=f"Final Summary - {format_time(elapsed)} - {format_size(self.tracker.bytes_total)}",
-                border_style="green",
-            )
-        )
+        self.ui.show_summary(stats)
 
         if self.failed_tracks:
             console.print(f"[yellow]Failed tracks saved to: {self.cfg.ERROR_FILE}[/yellow]")
@@ -281,18 +288,17 @@ class DownloadManager:
         # Guardar historial
         session_data = {
             "date": datetime.now().isoformat(),
-            "success": self.tracker.ok_count,
-            "skipped": self.tracker.skip_count,
-            "failed": self.tracker.err_count,
-            "duration_sec": int(elapsed),
-            "bytes": self.tracker.bytes_total,
+            "success": stats.get("ok", 0),
+            "skipped": stats.get("skip", 0),
+            "failed": stats.get("error", 0),
+            "bytes": stats.get("bytes", 0),
             "mode": self.cfg.MODE,
         }
         if self.cfg.SAVE_HISTORY:
             save_history(self.cfg.HISTORY_FILE, session_data)
 
         # Exportar playlist M3U
-        if self.cfg.GENERATE_M3U and self.tracker.ok_count > 0:
+        if self.cfg.GENERATE_M3U and stats.get("ok", 0) > 0:
             try:
                 # Recopilar archivos descargados
                 m3u_tracks = []

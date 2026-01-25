@@ -26,7 +26,7 @@ Failed_songs.*
 progress.json
 youtube_cache.json
 history.json
-cache.db
+*.db
 playlist.m3u
 cookies.txt
 *.log

@@ -1,193 +1,137 @@
-import json
-import os
-import threading
+import sqlite3
 import time
-from collections import deque
+import threading
+from typing import List, Dict, Optional
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Set
 
-from rich.console import Console, Group
-from rich.live import Live
-from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TaskID,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
-from rich.table import Table
-from rich.text import Text
+from resonance_audio_builder.core.config import Config
+from resonance_audio_builder.audio.metadata import TrackMetadata
 
-from .config import Config
+@dataclass
+class DownloadState:
+    track_id: str
+    artist: str
+    title: str
+    status: str
+    bytes_total: int
+    error: str
+    timestamp: float
 
-console = Console()
-
-class RichProgressTracker:
+class ProgressDB:
+    """Gestor de estado persistente usando SQLite"""
+    
     def __init__(self, config: Config):
         self.cfg = config
-        self.processed: Set[str] = set()
+        self.db_path = config.CHECKPOINT_FILE.replace(".json", ".db")
         self.lock = threading.RLock()
+        self._init_db()
 
-        self.ok_count = 0
-        self.err_count = 0
-        self.skip_count = 0
-        self.bytes_total = 0
-        self.start_time = 0
-
-        # Rich UI components
-        self.progress = Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-        )
-        self.active_downloads = Table.grid(expand=True)
-        self.active_downloads.add_column(style="dim")
-        self.active_downloads.add_column(justify="right")
-
-        self.log_buffer = deque(maxlen=8)
-        self.log_panel = None
-
-        self.layout = None
-        self.live = None
-        self.main_task = None
-        self.download_tasks: Dict[str, TaskID] = {}
-
-        self._load()
-
-    def _load(self):
-        if os.path.exists(self.cfg.CHECKPOINT_FILE):
-            try:
-                with open(self.cfg.CHECKPOINT_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    if isinstance(data, list):
-                        self.processed = set(data)
-            except:
-                pass
-
-    def save(self):
+    def _init_db(self):
+        """Inicializa esquema de la base de datos"""
         with self.lock:
-            try:
-                with open(self.cfg.CHECKPOINT_FILE, "w", encoding="utf-8") as f:
-                    json.dump(list(self.processed), f)
-            except:
-                pass
-
-    def reset_stats(self):
-        with self.lock:
-            self.ok_count = 0
-            self.err_count = 0
-            self.skip_count = 0
-            self.bytes_total = 0
-            self.start_time = time.time()
-
-    def reset_all(self):
-        """Reset all progress - uses RLock so nested calls work"""
-        with self.lock:
-            self.processed.clear()
-            self.reset_stats()
-        # Save outside of lock to avoid potential issues
-        self._save_no_lock()
-
-    def _save_no_lock(self):
-        """Internal save without acquiring lock"""
-        try:
-            with open(self.cfg.CHECKPOINT_FILE, "w", encoding="utf-8") as f:
-                json.dump(list(self.processed), f)
-        except:
-            pass
-
-    def get_stats_string(self) -> str:
-        with self.lock:
-            return f"OK: {self.ok_count} | Skp: {self.skip_count} | Err: {self.err_count}"
-
-    def start(self, total: int):
-        self.start_time = time.time()
-        self.main_task = self.progress.add_task("[cyan]Total Progress", total=total)
-
-        # Initial logs
-        panels = [
-            Panel(self.progress, title="Overall Progress", border_style="cyan"),
-            Panel(self.active_downloads, title="Active Downloads", border_style="green"),
-        ]
-
-        if self.cfg.DEBUG_MODE:
-            self.log_text = Text("\n".join(self.log_buffer) if self.log_buffer else "[dim]Waiting for logs...[/dim]")
-            panels.append(Panel(self.log_text, title="Live Logs", border_style="dim", height=10))
-
-        self.layout = Group(*panels)
-        self.live = Live(self.layout, refresh_per_second=4, console=console)
-        self.live.start()
-
-    def add_log(self, msg: str):
-        self.log_buffer.append(msg)
-
-        # Keep buffer small
-        if len(self.log_buffer) > 50:
-            self.log_buffer = self.log_buffer[-50:]
-
-        if hasattr(self, "log_text"):
-            start_idx = max(0, len(self.log_buffer) - 10)
-            # Remove rich tags for cleaner log history in UI
-            # self.log_buffer is a deque, convert to list to slice
-            clean_text = "\n".join(list(self.log_buffer)[start_idx:])
-            self.log_text.plain = clean_text  # Update Text object in-place
-
-    def stop(self):
-        if self.live:
-            self.live.stop()
-
-    def add_download_task(self, name: str, total_bytes: int = 100) -> TaskID:
-        # Añadir al progress
-        task_id = self.progress.add_task(f"[green]Downloading {name[:20]}", total=total_bytes)
-        return task_id
-
-    def update_download(self, task_id: TaskID, advance: int):
-        self.progress.update(task_id, advance=advance)
-
-    def remove_task(self, task_id: TaskID):
-        try:
-            self.progress.remove_task(task_id)
-        except:
-            pass
-
-    def mark(self, track_id: str, status: str, bytes_n: int = 0):
-        with self.lock:
-            self.processed.add(track_id)
-            if status == "ok":
-                self.ok_count += 1
-            elif status == "skip":
-                self.skip_count += 1
-            elif status == "error":
-                self.err_count += 1
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
             
-            if bytes_n > 0:
-                self.bytes_total += bytes_n
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS downloads (
+                    track_id TEXT PRIMARY KEY,
+                    artist TEXT,
+                    title TEXT,
+                    status TEXT,
+                    bytes INTEGER DEFAULT 0,
+                    error TEXT,
+                    timestamp REAL,
+                    retry_count INTEGER DEFAULT 0
+                )
+            """)
+            
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)")
+            conn.commit()
+            conn.close()
+
+    def mark(self, track: TrackMetadata, status: str, bytes_n: int = 0, error: str = None):
+        """Registra progreso de una descarga"""
+        with self.lock:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                # Si es un error, incrementar retry_count
+                if status == "error":
+                    conn.execute("""
+                        INSERT INTO downloads (track_id, artist, title, status, bytes, error, timestamp, retry_count)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                        ON CONFLICT(track_id) DO UPDATE SET
+                            status = excluded.status,
+                            error = excluded.error,
+                            timestamp = excluded.timestamp,
+                            retry_count = retry_count + 1
+                    """, (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()))
+                else:
+                    conn.execute("""
+                        INSERT INTO downloads (track_id, artist, title, status, bytes, error, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ON CONFLICT(track_id) DO UPDATE SET
+                            status = excluded.status,
+                            bytes = bytes + excluded.bytes,
+                            error = NULL,
+                            timestamp = excluded.timestamp
+                    """, (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()))
                 
-            self.save()
+                conn.commit()
+            finally:
+                conn.close()
 
     def is_done(self, track_id: str) -> bool:
+        """Verifica si una descarga está completada exitosamente"""
         with self.lock:
-            return track_id in self.processed
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.execute("SELECT 1 FROM downloads WHERE track_id = ? AND status = 'ok'", (track_id,))
+            exists = cursor.fetchone() is not None
+            conn.close()
+            return exists
 
-    def get_stats_table(self):
-        """Returns a rich table with final stats"""
-        t = Table(title="Session Summary")
-        t.add_column("Metric", style="cyan")
-        t.add_column("Value", style="magenta")
-        
-        duration = time.time() - self.start_time
-        downloaded_mb = self.bytes_total / (1024 * 1024)
-        
-        t.add_row("Total Time", f"{duration:.1f}s")
-        t.add_row("Downloaded", f"{downloaded_mb:.2f} MB")
-        t.add_row("Successful", str(self.ok_count))
-        t.add_row("Skipped", str(self.skip_count))
-        t.add_row("Failed", str(self.err_count))
-        
-        return t
+    def get_stats(self) -> Dict[str, int]:
+        """Retorna estadísticas de la sesión/base de datos"""
+        stats = {"ok": 0, "skip": 0, "error": 0, "bytes": 0}
+        with self.lock:
+            conn = sqlite3.connect(self.db_path)
+            # Count by status
+            cursor = conn.execute("SELECT status, COUNT(*), SUM(bytes) FROM downloads GROUP BY status")
+            for row in cursor:
+                status = row[0]
+                count = row[1]
+                total_bytes = row[2] or 0
+                
+                if status in stats:
+                    stats[status] = count
+                stats["bytes"] += total_bytes
+            conn.close()
+        return stats
+
+    def get_failed_tracks(self, max_retries: int = 3) -> List[TrackMetadata]:
+        """Obtiene lista de tracks fallidos que pueden reintentarse"""
+        tracks = []
+        with self.lock:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.execute("""
+                SELECT artist, title, track_id, error FROM downloads
+                WHERE status = 'error' AND retry_count < ?
+            """, (max_retries,))
+            
+            for row in cursor:
+                # Reconstruir métadatos mínimos para reintento
+                track = TrackMetadata(
+                    artist=row[0],
+                    title=row[1]
+                )
+                tracks.append(track)
+            conn.close()
+        return tracks
+
+    def clear(self):
+        """Limpia la base de datos"""
+        with self.lock:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("DELETE FROM downloads")
+            conn.commit()
+            conn.close()

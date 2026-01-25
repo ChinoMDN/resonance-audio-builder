@@ -2,6 +2,8 @@ import glob
 import os
 import shutil
 import csv
+import asyncio
+import traceback
 from typing import Optional, List
 from pathlib import Path
 
@@ -11,7 +13,7 @@ from rich.prompt import Prompt
 
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
-from resonance_audio_builder.core.state import RichProgressTracker
+from resonance_audio_builder.core.state import ProgressDB
 from resonance_audio_builder.core.ui import print_header, clear_screen, console
 from resonance_audio_builder.core.manager import DownloadManager
 from resonance_audio_builder.network.cache import CacheManager
@@ -23,7 +25,7 @@ class App:
     def __init__(self):
         self.cfg = Config.load()  # Carga desde config.json si existe
         self.log = Logger(self.cfg.DEBUG_MODE)
-        self.tracker = RichProgressTracker(self.cfg)
+        self.db = ProgressDB(self.cfg)
 
         # Init SQLite Cache (replaces old JSON cache)
         try:
@@ -50,7 +52,10 @@ class App:
 
         # Stats
         cache_count = self.cache.count() if self.cache else 0
-        progress_count = len(self.tracker.processed)
+        
+        # Get stats from DB
+        stats = self.db.get_stats()
+        progress_count = stats.get("ok", 0) + stats.get("skip", 0) + stats.get("error", 0)
 
         # Grid layout
         grid = Table.grid(expand=True, padding=(0, 2))
@@ -179,9 +184,11 @@ class App:
         Si csv_files es None, pide selección al usuario.
         """
         if csv_files is None:
+            clear_screen()
+            print_header()
             csv_files = self._select_csv()
             if not csv_files:
-                input("\nENTER para continuar...")
+                console.print("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
                 return
 
         if ask_quality:
@@ -224,8 +231,15 @@ class App:
         print(f"\n[i] {len(tracks)} canciones únicas detectadas en total")
 
         # Ejecutar descarga
-        manager = DownloadManager(self.cfg, self.cache)
-        manager.run(tracks)
+        try:
+            manager = DownloadManager(self.cfg, self.cache)
+            asyncio.run(manager.run(tracks))
+        except Exception:
+            with open("crash.log", "w", encoding="utf-8") as f:
+                f.write(traceback.format_exc())
+            console.print(f"\n[bold red][!] Error crítico guardado en crash.log[/bold red]")
+        
+        console.input("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
 
     def _retry_failed(self):
         """Reintenta descargar canciones fallidas"""
@@ -233,24 +247,21 @@ class App:
         print_header()
 
         if not os.path.exists(self.cfg.ERROR_CSV):
-            print("\n[!] No hay archivo de canciones fallidas.")
-            print(f"    ({self.cfg.ERROR_CSV} no existe)")
-            input("\nENTER para continuar...")
+            console.print("\n[yellow][!] No hay archivo de canciones fallidas.[/yellow]")
+            console.print(f"    [dim]({self.cfg.ERROR_CSV} no existe)[/dim]")
+            console.input("\n[bold cyan]Presiona ENTER para volver...[/bold cyan]")
             return
 
         rows = self._read_csv(self.cfg.ERROR_CSV)
         if not rows:
-            print("\n[!] El archivo de fallidas esta vacio.")
-            input("\nENTER para continuar...")
+            console.print("\n[yellow][!] El archivo de fallidas esta vacio.[/yellow]")
+            console.input("\n[bold cyan]Presiona ENTER para volver...[/bold cyan]")
             return
 
         tracks = [TrackMetadata.from_csv_row(row) for row in rows]
 
         # Eliminar de procesadas para que se reintenten
-        for t in tracks:
-            if t.track_id in self.tracker.processed:
-                self.tracker.processed.remove(t.track_id)
-        self.tracker.save()
+        # pass
 
         # Eliminar duplicados
         unique = {}
@@ -266,7 +277,7 @@ class App:
 
         # Ejecutar descarga
         manager = DownloadManager(self.cfg, self.cache)
-        manager.run(tracks)
+        asyncio.run(manager.run(tracks))
 
         input("\nENTER para continuar...")
 
@@ -313,13 +324,8 @@ class App:
 
         # Clear Progress
         if sel in ["2", "3"]:
-            if os.path.exists(self.cfg.CHECKPOINT_FILE):
-                try:
-                    os.remove(self.cfg.CHECKPOINT_FILE)
-                except:
-                    pass
-            self.tracker.reset_all()
-            deleted.append("Progress")
+            self.db.clear()
+            deleted.append("Progress (DB)")
 
         # Clear All also deletes history and playlist
         if sel == "3":
@@ -414,7 +420,7 @@ class App:
 
             if sel == "1":
                 self._start_download() # Interactivo
-                input("\nENTER para continuar...")
+                console.input("\n[bold cyan]Presiona ENTER para continuar...[/bold cyan]")
                 self._notify_end()
             elif sel == "2":
                 self._retry_failed()

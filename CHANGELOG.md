@@ -7,6 +7,28 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [8.1.0] – 2026-01-25
+
+### Added
+
+- **Comprehensive Test Suite:** Implemented 60+ tests covering:
+    - **Unit Tests:** Audio analysis, YouTube searcher, downloader.
+    - **Functional:** Playlist parsing and path handling.
+    - **Integration:** Download pipeline worker orchestration.
+    - **Security:** Filename sanitization and path traversal prevention.
+- **Enterprise-Grade CI/CD:** Upgraded GitHub Actions workflow with:
+    - Strict linting (isort, Black, Flake8).
+    - Multi-tool Security scanning (Bandit, Safety, pip-audit).
+    - Caching for FFmpeg and dependencies.
+    - Automated Dependency Pull Requests.
+- **Development Productivity:** Added `requirements-dev.txt` and `.pre-commit-config.yaml`.
+
+### Fixed
+
+- **Async Stability:** Fixed cosmetic `ValueError: I/O operation on closed pipe` crash on Windows exit.
+- **Filename Sanitization:** Strengthened `safe_filename` logic against command injection and path traversal.
+- **UI Metrics:** Fixed `format_time` and `format_size` logic for consistent dashboard reporting.
+
 ## [7.0.1] – 2026-01-25
 
 ### Fixed

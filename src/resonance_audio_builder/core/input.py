@@ -20,6 +20,7 @@ class KeyboardController:
         """Inicia el listener de teclado"""
         self._running = True
         self._thread = threading.Thread(target=self._listen, daemon=True)
+        self.log.debug("Keyboard thread created")
         self._thread.start()
 
     def stop(self):
@@ -55,11 +56,15 @@ class KeyboardController:
 
             while self._running and not self.quit_event.is_set():
                 if msvcrt.kbhit():
-                    key = msvcrt.getch().decode("utf-8", errors="ignore").upper()
+                    key_raw = msvcrt.getch()
+                    self.log.debug(f"Key detected: {key_raw}")
+                    key = key_raw.decode("utf-8", errors="ignore").upper()
                     self._handle_key(key)
                 time.sleep(0.1)
-        except:
-            pass
+        except Exception as e:
+            self.log.error(f"Keyboard listener error: {e}")
+            import traceback
+            self.log.error(traceback.format_exc())
 
     def _listen_unix(self):
         try:

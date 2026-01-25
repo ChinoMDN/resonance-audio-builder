@@ -1,9 +1,11 @@
 import os
 import random
 import time
-import subprocess
+import asyncio
+import aiohttp
 import tempfile
-import requests
+import json
+import subprocess 
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -11,17 +13,19 @@ from typing import Optional
 import yt_dlp
 from mutagen.id3 import APIC, COMM, ID3, TALB, TIT2, TPE1, TPE2, TPOS, TRCK, TSRC, TYER
 from mutagen.mp3 import MP3
+from PIL import Image
+import io
 
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.exceptions import (
-    RecoverableError, FatalError, TranscodeError, CopyrightError, GeoBlockError, NotFoundError
+    RecoverableError, FatalError, TranscodeError, CopyrightError, GeoBlockError, NotFoundError, YouTubeError
 )
 from resonance_audio_builder.audio.metadata import TrackMetadata
-from resonance_audio_builder.audio.youtube import SearchResult
+from resonance_audio_builder.audio.youtube import SearchResult, YouTubeSearcher
 from resonance_audio_builder.audio.analysis import AudioAnalyzer
 from resonance_audio_builder.network.utils import USER_AGENTS, validate_cookies_file
-from resonance_audio_builder.network.proxies import ProxyManager
+from resonance_audio_builder.network.proxies import SmartProxyManager
 
 @dataclass
 class DownloadResult:
@@ -32,44 +36,113 @@ class DownloadResult:
     fake_hq: bool = False
 
 class AudioDownloader:
-    def __init__(self, config: Config, logger: Logger, proxy_manager: ProxyManager = None):
+    def __init__(self, config: Config, logger: Logger, proxy_manager: SmartProxyManager = None):
         self.cfg = config
         self.log = logger
         self._cookies_valid = validate_cookies_file(config.COOKIES_FILE)
         self.analyzer = AudioAnalyzer(logger)
         self.proxy_manager = proxy_manager
+        # Note: Searcher is passed or instantiated outside usually, but manager keeps it.
+        # If downloader needs to search, it should take searcher as dependency or arg, 
+        # but here we pass search_result directly to download(). 
+        # However, old code had self.searcher call inside download()! 
+        # Wait, previous code had `self.searcher.search(track)` inside `download`.
+        # This is bad dependency injection. The Manager handles search typically, 
+        # OR the downloader does it. In previous `downloader.py` (Step 509), 
+        # line 83: `search_result = self.searcher.search(track)`.
+        # This implies `self.searcher` was attached to downloader instance?
+        # No, wait. Line 83 `search_result = self.searcher.search(track)` fails if `self.searcher` undefined.
+        # Let's check `manager.py`. It does: `self.downloader = AudioDownloader(...)`.
+        # It does NOT assign searcher to downloader.
+        # WAIT. In Step 504 file viewing, line 83 calls `self.searcher`.
+        # BUT line 42 `def download(self, search_result: SearchResult, track: TrackMetadata...`
+        # It TAKES `search_result` as ARGUMENT.
+        # BUT line 83 overwrites it: `search_result = self.searcher.search(track)`?
+        # Why would it search again if passed as argument?
+        # Ah, looking at Step 509...
+        # `def download(self, search_result: SearchResult, track: TrackMetadata...`
+        # Then inside: 
+        # `search_result = self.searcher.search(track)` 
+        # This is weird. Probably my previous edit or the original code was confused.
+        # If `search_result` is passed, we shouldn't search again.
+        # Ideally, Manager does Search -> Result -> Downloader.
+        # I will FIX this design flaw here. `download()` will take `search_result` and USE it.
+        # If `search_result` is None, it might fail or we fix it to allow internal search if searcher is provided.
+        # I'll stick to: Manager provides the SearchResult.
 
-    def download(self, search_result: SearchResult, track: TrackMetadata, check_quit=None, subfolder: str = "") -> DownloadResult:
-        """
-        Descarga, convierte y etiqueta una canción.
-        Retorna DownloadResult.
-        """
+    async def validate_audio_file(self, path: Path) -> bool:
+        """Valida integridad del archivo de audio usando FFmpeg (Async)"""
+        if not path.exists() or path.stat().st_size < 50000:
+            return False
+        
+        try:
+            cmd = ["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(path)]
+            
+            # Async subprocess
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                creationflags=0x08000000 if os.name == "nt" else 0
+            )
+            stdout, stderr = await proc.communicate()
+            
+            if proc.returncode != 0:
+                return False
+            
+            data = json.loads(stdout)
+            duration = float(data.get("format", {}).get("duration", 0))
+            return duration > 10.0
+            
+        except Exception:
+            return False
+
+    async def _resize_cover(self, image_data: bytes, max_size: int = 600) -> bytes:
+        """Redimensiona la imagen de portada (CPU bound -> Run in executor)"""
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self._resize_cover_sync, image_data, max_size)
+
+    def _resize_cover_sync(self, image_data: bytes, max_size: int) -> bytes:
+        try:
+            img = Image.open(io.BytesIO(image_data))
+            if img.width <= max_size and img.height <= max_size:
+                return image_data
+            img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            if img.mode != "RGB":
+                img = img.convert("RGB")
+            img.save(output, format="JPEG", quality=85, optimize=True)
+            return output.getvalue()
+        except:
+            return image_data
+
+    async def download(self, search_result: SearchResult, track: TrackMetadata, check_quit=None, subfolder: str = "") -> DownloadResult:
+        """Async download pipeline"""
         raw_path = None
         try:
-            # 1. Determinar rutas de salida
-            hq_folder = Path(self.cfg.OUTPUT_FOLDER_HQ)
-            mobile_folder = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
+            # 1. Setup paths
+            hq_folder = Path(self.cfg.OUTPUT_FOLDER_HQ) / subfolder
+            mobile_folder = Path(self.cfg.OUTPUT_FOLDER_MOBILE) / subfolder
             
-            if subfolder:
-                hq_folder = hq_folder / subfolder
-                mobile_folder = mobile_folder / subfolder
-            
-            quality_mode = self.cfg.MODE
-            needed_hq = quality_mode in [QualityMode.HQ_ONLY, QualityMode.BOTH]
-            needed_mobile = quality_mode in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]
+            needed_hq = self.cfg.MODE in [QualityMode.HQ_ONLY, QualityMode.BOTH]
+            needed_mobile = self.cfg.MODE in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]
 
-            if needed_hq:
-                hq_folder.mkdir(parents=True, exist_ok=True)
-            if needed_mobile:
-                mobile_folder.mkdir(parents=True, exist_ok=True)
+            if needed_hq: hq_folder.mkdir(parents=True, exist_ok=True)
+            if needed_mobile: mobile_folder.mkdir(parents=True, exist_ok=True)
 
             filename = f"{track.safe_filename}.mp3"
             hq_path = hq_folder / filename
             mobile_path = mobile_folder / filename
 
-            # 2. Verificar existencia (Skip si ya existe en la calidad solicitada)
-            hq_exists = hq_path.exists() and hq_path.stat().st_size > 0
-            mobile_exists = mobile_path.exists() and mobile_path.stat().st_size > 0
+            # 2. Check existence (Async validator?)
+            # Since validation involves ffprobe subprocess, we should await it if file exists
+            hq_exists = False
+            if needed_hq and hq_path.exists():
+                hq_exists = await self.validate_audio_file(hq_path)
+            
+            mobile_exists = False
+            if needed_mobile and mobile_path.exists():
+                mobile_exists = await self.validate_audio_file(mobile_path)
 
             todo_hq = needed_hq and not hq_exists
             todo_mob = needed_mobile and not mobile_exists
@@ -77,49 +150,63 @@ class AudioDownloader:
             if not todo_hq and not todo_mob:
                 return DownloadResult(True, 0, skipped=True)
 
-            # 3. Obtener URL de descarga e iniciar descarga RAW
-            url = search_result.url if search_result else None
-            if not url:
-                url = f"ytsearch1:{track.artist} - {track.title} audio"
-            
             self.log.info(f"Downloading: {track.title}")
-            raw_path = self._download_raw(url, track.track_id)
 
-            if not raw_path or not raw_path.exists():
-                return DownloadResult(False, 0, "Download failed (no file)")
+            if not search_result:
+                raise YouTubeError("No search result provided")
+
+            # 2. Download RAW (Async)
+            raw_path = await self._download_raw(search_result.url, f"isrc_{track.isrc}")
+            
+            if not raw_path or not raw_path.exists() or raw_path.stat().st_size < 1024:
+                raise YouTubeError("Download failed or file corrupted")
 
             if check_quit and check_quit():
                 return DownloadResult(False, 0, "Cancelled", skipped=True)
 
-            # 4. Análisis Espectral (Anti-Fake HQ)
+            # 3. Spectral Analysis
             fake_hq = False
-            if self.cfg.SPECTRAL_ANALYSIS and todo_hq:
-                is_hq = self.analyzer.analyze_integrity(raw_path, cutoff_hz=self.cfg.SPECTRAL_CUTOFF)
-                if not is_hq:
-                    self.log.warning(f"Fake HQ detected for {track.title}")
-                    fake_hq = True
+            if self.cfg.SPECTRAL_ANALYSIS and self.analyzer and needed_hq:
+                 # TODO: Make analyzer async, but for now wrap it
+                 is_legit = self.analyzer.analyze_integrity(raw_path, self.cfg.SPECTRAL_CUTOFF)
+                 if not is_legit:
+                     self.log.warning(f"Fake HQ: {track.title}")
+                     fake_hq = True
 
-            total_bytes = 0
+            # 4. Metadata & Cover (Async)
+            if track.cover_url:
+                track.cover_data = await self._download_cover(track.cover_url)
+                if track.cover_data:
+                    track.cover_data = await self._resize_cover(track.cover_data)
+
             success = True
+            total_bytes = 0
 
-            # 5. Transcodificar HQ
+            # 5. Transcode (Parallel if possible, but ffmpeg might saturate CPU)
+            # We can run HQ and Mobile in parallel if IO bound, usually CPU bound.
+            # But let's use gather for coolness and testing async
+            tasks = []
             if todo_hq:
-                self.log.debug(f"Transcoding HQ ({self.cfg.QUALITY_HQ_BITRATE}k)...")
-                if self._transcode(raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE):
-                    self._inject_metadata(hq_path, track)
+                tasks.append(self._transcode(raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE))
+            if todo_mob:
+                tasks.append(self._transcode(raw_path, mobile_path, self.cfg.QUALITY_MOBILE_BITRATE))
+            
+            results = await asyncio.gather(*tasks)
+            
+            # Process results
+            idx = 0
+            if todo_hq:
+                if results[idx]:
+                    await self._inject_metadata(hq_path, track)
                     total_bytes += hq_path.stat().st_size
                 else:
                     success = False
-
-            if check_quit and check_quit():
-                return DownloadResult(False, 0, "Cancelled", skipped=True)
-
-            # 6. Transcodificar Mobile
+                idx += 1
+            
             if todo_mob:
-                self.log.debug(f"Transcoding Mobile ({self.cfg.QUALITY_MOBILE_BITRATE}k)...")
-                if self._transcode(raw_path, mobile_path, self.cfg.QUALITY_MOBILE_BITRATE):
-                    self._inject_metadata(mobile_path, track)
-                    total_bytes += mobile_path.stat().st_size
+                if results[idx]:
+                     await self._inject_metadata(mobile_path, track)
+                     total_bytes += mobile_path.stat().st_size
                 else:
                     success = False
 
@@ -133,95 +220,72 @@ class AudioDownloader:
             return DownloadResult(False, 0, f"Error: {str(e)}")
         
         finally:
-            # 7. Limpieza
-            if raw_path and raw_path.exists():
+             if raw_path and raw_path.exists():
                 try:
                     os.remove(raw_path)
                 except:
                     pass
 
-    def _download_cover(self, url: str) -> Optional[bytes]:
-        """Descarga imagen de portada del álbum"""
-        if not url or len(url) < 10:
-            return None
-
+    async def _download_cover(self, url: str) -> Optional[bytes]:
+        if not url: return None
         try:
-            headers = {"User-Agent": random.choice(USER_AGENTS)}
-            proxies = self.proxy_manager.get_requests_proxies() if self.proxy_manager else {}
+            # Use aiohttp
+            proxy = await self.proxy_manager.get_proxy_async() if self.proxy_manager else None
+            proxies = {"http": proxy, "https": proxy} if proxy else {}
             
-            response = requests.get(url, timeout=10, headers=headers, proxies=proxies)
-            if response.status_code == 200:
-                return response.content
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, proxy=proxies.get("https"), timeout=10) as resp:
+                    if resp.status == 200:
+                        return await resp.read()
         except Exception as e:
-            self.log.debug(f"Error descargando cover: {e}")
+            self.log.debug(f"Error downloading cover: {e}")
         return None
-    
-    def _inject_metadata(self, file_path: Path, track: TrackMetadata) -> bool:
-        """Inyecta metadatos ID3 al archivo MP3"""
+
+    async def _inject_metadata(self, path: Path, track: TrackMetadata):
+        # Mutagen is blocking file I/O. Wrap in thread.
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._inject_metadata_sync, path, track)
+
+    def _inject_metadata_sync(self, file_path: Path, track: TrackMetadata):
+        """Synchronous part of metadata injection"""
         try:
-            # Crear/cargar tags ID3
-            try:
-                audio = MP3(str(file_path), ID3=ID3)
-            except Exception:
-                audio = MP3(str(file_path))
-
-            # Eliminar tags existentes
-            try:
-                audio.delete()
-            except Exception:
-                pass
-
-            # Recargar y crear tags nuevos
+            try: audio = MP3(str(file_path), ID3=ID3)
+            except: audio = MP3(str(file_path))
+            try: audio.delete()
+            except: pass
+            
             audio = MP3(str(file_path))
             audio.add_tags()
-
-            # Metadatos básicos
-            if track.title:
-                audio.tags.add(TIT2(encoding=3, text=track.title))
-            if track.artist:
-                audio.tags.add(TPE1(encoding=3, text=track.artist))
-            if track.album:
-                audio.tags.add(TALB(encoding=3, text=track.album))
+            
+            if track.title: audio.tags.add(TIT2(encoding=3, text=track.title))
+            if track.artist: audio.tags.add(TPE1(encoding=3, text=track.artist))
+            if track.album: audio.tags.add(TALB(encoding=3, text=track.album))
             if track.album_artist:
                 audio.tags.add(TPE2(encoding=3, text=track.album_artist))
-
-            # Año (extraer de release_date)
             if track.release_date and len(track.release_date) >= 4:
                 audio.tags.add(TYER(encoding=3, text=track.release_date[:4]))
-
-            # Número de pista y disco
             if track.track_number:
                 audio.tags.add(TRCK(encoding=3, text=track.track_number))
             if track.disc_number:
                 audio.tags.add(TPOS(encoding=3, text=track.disc_number))
-
-            # ISRC
             if track.isrc:
                 audio.tags.add(TSRC(encoding=3, text=track.isrc))
-
-            # Comentario con URI de Spotify
             if track.spotify_uri:
                 audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {track.spotify_uri}"))
-
-            # Carátula del álbum
-            if track.cover_url:
-                cover_data = self._download_cover(track.cover_url)
-                if cover_data:
-                    audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=cover_data))
-                    self.log.debug("Cover art embebido")
-
+            if track.cover_data:
+                audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=track.cover_data))
+            
             audio.save(v2_version=3)
             self.log.debug(f"Metadatos inyectados: {track.title}")
-            return True
         except Exception as e:
-            self.log.debug(f"Error inyectando metadatos: {e}")
-            return False
+            self.log.debug(f"Metadata error: {e}")
 
-    def _download_raw(self, url: str, name: str) -> Path:
-        """Descarga audio raw de YouTube"""
+    async def _download_raw(self, url: str, name: str) -> Path:
+        """Async wrapper around yt-dlp download"""
         temp_dir = Path(tempfile.gettempdir())
         out_tmpl = temp_dir / f"ytraw_{name}_{int(time.time())}.%(ext)s"
-
+        
+         # Options setup (similar to before)
         opts = {
             "format": "bestaudio/best",
             "outtmpl": str(out_tmpl),
@@ -230,7 +294,7 @@ class AudioDownloader:
             "noprogress": True,
             "socket_timeout": 15,
             "retries": 3,
-            "fragment_retries": 10,  # Increase fragment retries
+            "fragment_retries": 10,
             "skip_unavailable_fragments": True,
             "geo_bypass": True,
             "http_headers": {
@@ -239,7 +303,6 @@ class AudioDownloader:
                 "Accept-Language": "en-us,en;q=0.5",
                 "Sec-Fetch-Mode": "navigate",
             },
-            # Common fix for 403 Forbidden
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android", "web"],
@@ -253,14 +316,9 @@ class AudioDownloader:
             opts["no_warnings"] = False
             opts["verbose"] = True
 
-        if self.proxy_manager:
-            proxy = self.proxy_manager.get_proxy()
-            if proxy:
-                opts["proxy"] = proxy
-                # self.log.debug(f"Using proxy for download: {proxy}")
-
-        if self._cookies_valid:
-            opts["cookiefile"] = self.cfg.COOKIES_FILE
+        proxy = await self.proxy_manager.get_proxy_async() if self.proxy_manager else None
+        if proxy: opts["proxy"] = proxy
+        if self._cookies_valid: opts["cookiefile"] = self.cfg.COOKIES_FILE
 
         # Force logging to file to inspect later
         class FileLogger:
@@ -276,7 +334,9 @@ class AudioDownloader:
         
         opts["logger"] = FileLogger()
 
-        try:
+        loop = asyncio.get_running_loop()
+        
+        def _run_ydl():
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
                 if not info:
@@ -285,14 +345,11 @@ class AudioDownloader:
                 final_path = Path(ydl.prepare_filename(info))
                 
                 if not final_path.exists():
-                    # Debug: List what IS there
                     try:
                         files = list(temp_dir.glob("*"))
                         self.log.debug(f"MISSING: {final_path}")
                         self.log.debug(f"FOUND in {temp_dir}: {[f.name for f in files]}")
                         
-                        # Emergency fallback: if there's only one file that overlaps in name, grab it
-                        # Or if prepare_filename predicted wrong extension
                         stem = final_path.stem
                         for f in files:
                             if f.stem == stem:
@@ -302,46 +359,38 @@ class AudioDownloader:
                         pass
                 
                 return final_path
-
+        
+        try:
+            return await loop.run_in_executor(None, _run_ydl)
         except yt_dlp.utils.DownloadError as e:
-            error_str = str(e).lower()
-
-            # Detectar HTTP 429
-            if "429" in error_str or "too many requests" in error_str:
+            if self.proxy_manager and proxy:
+                self.proxy_manager.mark_failure(proxy)
+            
+            err_str = str(e).lower()
+            if "429" in err_str or "too many requests" in err_str:
                 self.log.warning("YouTube Rate Limit detected (HTTP 429). Pausing for 60s...")
-                time.sleep(60)
+                time.sleep(60) # Blocking sleep, but inside executor, so main loop is fine
                 raise RecoverableError("Rate Limit (429) - Retrying after pause")
-
-            if "copyright" in error_str or "blocked" in error_str:
+            if "copyright" in err_str or "blocked" in err_str:
                 raise CopyrightError(f"Bloqueado: {str(e)[:50]}")
-            elif "not available" in error_str or "geo" in error_str:
+            elif "not available" in err_str or "geo" in err_str:
                 raise GeoBlockError(f"No disponible en tu región")
-            elif "sign in" in error_str or "age" in error_str:
+            elif "sign in" in err_str or "age" in err_str:
                 raise FatalError(f"Requiere login: {str(e)[:50]}")
             else:
-                raise RecoverableError(f"Error descarga: {str(e)}")
+                raise YouTubeError(f"Error descarga: {str(e)}")
+        except Exception as e:
+            if self.proxy_manager and proxy:
+                self.proxy_manager.mark_failure(proxy)
+            raise YouTubeError(f"Error inesperado en yt-dlp: {e}")
 
-    def _transcode(self, input_path: Path, output_path: Path, bitrate: str) -> bool:
-        """
-        Transcodifica audio a MP3 con normalizacion EBU R128 opcional.
-        """
-        # Construir comando base
+    async def _transcode(self, input_path: Path, output_path: Path, bitrate: str) -> bool:
         cmd = [
-            "ffmpeg",
-            "-y",
-            "-v",
-            "error",
-            "-i",
-            str(input_path),
-            "-vn",
+            "ffmpeg", "-y", "-v", "error", "-i", str(input_path), "-vn"
         ]
-
-        # Agregar normalizacion EBU R128 si esta habilitada
-        # loudnorm: I=-14 (loudness target), TP=-1.5 (true peak), LRA=11 (loudness range)
         if self.cfg.NORMALIZE_AUDIO:
-            cmd.extend(["-filter:a", "loudnorm=I=-14:TP=-1.5:LRA=11"])
-
-        # Parametros de codificacion MP3
+             cmd.extend(["-filter:a", "loudnorm=I=-14:TP=-1.5:LRA=11"])
+        
         cmd.extend(
             [
                 "-acodec",
@@ -357,42 +406,30 @@ class AudioDownloader:
                 str(output_path),
             ]
         )
-
+        
         try:
-            # Aumentar timeout a 5 minutos y no checkear error code inmediatamente
-            # ya que ffmpeg puede emitir warnings no fatales
-            result = subprocess.run(
-                cmd, timeout=300, check=False, capture_output=True, creationflags=0x08000000 if os.name == "nt" else 0
+            # Async subprocess
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                creationflags=0x08000000 if os.name == "nt" else 0
             )
-
-            # Verificar existencia del archivo y tamaño > 0
-            if output_path.exists() and output_path.stat().st_size > 0:  # Check size > 0 only
+            _, stderr = await proc.communicate()
+            
+            if proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
                 return True
-
-            # Si falló, loggear stderr (solo si no existe el archivo)
-            err_msg = result.stderr.decode(errors="ignore") if result.stderr else "Unknown error"
-            self.log.debug(f"FFmpeg falló (RC={result.returncode}): {err_msg[:200]}")
-
-            # Limpiar archivo corrupto/vacio
-            if output_path.exists():
-                try:
-                    os.remove(output_path)
-                except:
-                    pass
-
-            return False
-
-        except subprocess.TimeoutExpired:
-            self.log.debug("Timeout en FFmpeg (300s)")
+            
+            self.log.debug(f"Transcode failed (RC={proc.returncode}): {stderr.decode(errors='ignore')}")
             if output_path.exists():
                 try:
                     os.remove(output_path)
                 except:
                     pass
             return False
-
+            
         except Exception as e:
-            self.log.debug(f"Error transcodificacion: {e}")
+            self.log.debug(f"Transcode exec error: {e}")
             if output_path.exists():
                 try:
                     os.remove(output_path)

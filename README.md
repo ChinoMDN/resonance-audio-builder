@@ -4,6 +4,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![yt-dlp](https://img.shields.io/badge/yt--dlp-latest-red.svg)](https://github.com/yt-dlp/yt-dlp)
 [![CI](https://github.com/ChinoMDN/resonance-audio-builder/actions/workflows/ci.yml/badge.svg)](https://github.com/ChinoMDN/resonance-audio-builder/actions)
+[![Coverage](https://codecov.io/gh/ChinoMDN/resonance-audio-builder/branch/main/graph/badge.svg)](https://codecov.io/gh/ChinoMDN/resonance-audio-builder)
+[![Security: Bandit](https://img.shields.io/badge/security-bandit-yellow.svg)](https://github.com/PyCQA/bandit)
 
 Build and manage a personal audio library using publicly accessible media sources, enriched with professional metadata, lyrics, and loudness normalization.
 
@@ -53,18 +55,21 @@ Resonance focuses on **library quality and consistency**, providing:
 
 ## Features
 
-| Feature                    | Description                                                   |
-| -------------------------- | ------------------------------------------------------------- |
-| **Rich UI**                | Professional terminal interface with live progress            |
-| **Spectral Analysis**      | **NEW!** Detects fake HG audio (upscaled 128kbps)             |
-| **Watchdog Mode**          | **NEW!** Auto-downloads when you drop CSVs into `Playlists/`  |
-| **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources) |
-| **Multi-profile Encoding** | Configurable high and low bitrate audio profiles              |
-| **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume             |
-| **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                      |
-| **Smart Matching**         | ISRC-based matching with text-search fallback                 |
-| **Resume Support**         | Checkpoint-based recovery for interrupted sessions            |
-| **Organized Output**       | **NEW!** Auto-sorts lists into subfolders                     |
+| Feature                    | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| **Rich UI**                | Professional terminal interface with live progress             |
+| **Spectral Analysis**      | Detects fake HG audio (upscaled 128kbps)                       |
+| **Watchdog Mode**          | Auto-downloads when you drop CSVs into `Playlists/`            |
+| **Enterprise CI/CD**       | **NEW!** Automated linting, security scanning, and builds      |
+| **Testing Suite**          | **NEW!** 60+ Unit, Integration, and Security tests             |
+| **Security Hardened**      | **NEW!** Protection against Path Traversal & Command Injection |
+| **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources)  |
+| **Multi-profile Encoding** | Configurable high and low bitrate audio profiles               |
+| **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume              |
+| **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                       |
+| **Smart Matching**         | ISRC-based matching with text-search fallback                  |
+| **Resume Support**         | Checkpoint-based recovery for interrupted sessions             |
+| **Organized Output**       | Auto-sorts lists into subfolders                               |
 
 ---
 
@@ -102,6 +107,17 @@ You can run the application in three ways:
 Choose between **High Quality (320kbps)**, **Mobile (96kbps)**, or **Both**. The builder will start processing your list immediately.
 
 ---
+
+## Testing
+
+Version 8.1.0 introduces a comprehensive test suite. To run the tests, install the development dependencies and use `pytest`:
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/
+```
+
+The suite covers Tier 1 (Unit), Tier 2 (Network), Tier 3 (Security), and Tier 4 (Integration).
 
 ## Configuration
 
@@ -211,7 +227,9 @@ resonance-audio-builder/
 ├── pyproject.toml
 ├── config.json
 ├── requirements.txt
-├── run.py                  # Access point
+├── requirements-dev.txt     # New! Development and CI tools
+├── .pre-commit-config.yaml    # New! Local quality hooks
+├── run.py                    # Access point
 └── README.md
 ```
 

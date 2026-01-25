@@ -1,11 +1,14 @@
 # Archivos de estado y cache
 progress.json
 youtube_cache.json
-cache.db
+*.db
 history.json
 playlist.m3u
 Failed_songs.txt
 Failed_songs.csv
+crash_exit.txt
+debug.log
+test_output.txt
 
 # Datos sensibles y descargas
 cookies.txt
@@ -16,6 +19,9 @@ temp_downloads/
 ytdlp_raw.log
 ytdlp_raw.log.*
 *.log
+.coverage
+htmlcov/
+.pytest_cache/
 
 # Python
 __pycache__/

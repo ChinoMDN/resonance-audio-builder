@@ -64,8 +64,14 @@ class TrackMetadata:
     @property
     def safe_filename(self) -> str:
         name = f"{self.artist} - {self.title}"
-        invalids = '<>:"/\\|?*'
+        # Include ; for security, and other common shell chars
+        invalids = '<>:"/\\|?*;$#&()![]{}'
         for char in invalids:
             name = name.replace(char, "")
+        
+        # Sequentially collapse any sequences of dots that could form ..
+        while ".." in name:
+            name = name.replace("..", ".")
+            
         name = name.strip().rstrip(".")
         return name[:150]

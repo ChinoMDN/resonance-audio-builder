@@ -12,7 +12,7 @@
     "rate_limit_delay_max": 2.0,
     "normalize_audio": true,
     "verify_md5": true,
-    "generate_m3u": true,
+    "generate_m3u": false,
     "save_history": true,
     "debug_mode": false,
     "output_format": "mp3",

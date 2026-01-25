@@ -1,5 +1,5 @@
 # Base image
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Set environment
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -29,6 +29,10 @@ COPY . .
 
 # Set permissions
 RUN chown -R appuser:appuser /app
+
+# Create necessary folders for volume mounting
+RUN mkdir -p Playlists Audio_HQ Audio_Mobile && \
+    chown appuser:appuser Playlists Audio_HQ Audio_Mobile
 
 # Switch to non-root user
 USER appuser

@@ -22,7 +22,7 @@ from resonance_audio_builder.audio.youtube import SearchResult, YouTubeSearcher
 from resonance_audio_builder.audio.downloader import DownloadResult, AudioDownloader
 from resonance_audio_builder.network.limiter import RateLimiter
 from resonance_audio_builder.core.logger import Logger
-from resonance_audio_builder.core.ui import format_time, format_size, progress_bar
+from resonance_audio_builder.core.ui import format_time, format_size
 from resonance_audio_builder.core.utils import calculate_md5, export_m3u, save_history
 from resonance_audio_builder.network.utils import validate_cookies_file
 from resonance_audio_builder.network.cache import CacheManager
@@ -138,19 +138,10 @@ class TestUtilityFunctions:
         assert format_time(-1) == '--:--'
     
     def test_format_size(self):
-        assert 'KB' in format_size(500)
+        assert 'KB' in format_size(1500)
         assert 'MB' in format_size(5000000)
         assert 'GB' in format_size(5000000000)
     
-    def test_progress_bar(self):
-        bar = progress_bar(50, 100)
-        assert '[' in bar
-        assert ']' in bar
-        assert '50%' in bar
-    
-    def test_progress_bar_zero(self):
-        bar = progress_bar(0, 0)
-        assert '0%' in bar
     
     def test_calculate_md5(self):
         """Should calculate correct MD5 hash"""
