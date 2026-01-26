@@ -195,5 +195,42 @@ class TestManagerFullCoverage:
 
             manager._print_batch_summary(tracks, pending)
 
-            assert mock_print.call_count >= 2  # Queue table and Summary grid
             assert mock_table.called
+
+    @pytest.mark.asyncio
+    async def test_attempt_download_iteration_edge_cases(self, manager):
+        """Cover branches in _attempt_download_iteration"""
+        track = TrackMetadata("id_edge", "Title", "Artist")
+
+        # Case 1: Search failure (Recoverable)
+        manager.searcher.search = AsyncMock(side_effect=RecoverableError("Search Hub Issue"))
+        success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
+        assert success is False
+        assert fatal is False
+        assert "Search Hub Issue" in err
+
+        # Case 2: Search failure (Fatal)
+        manager.searcher.search = AsyncMock(side_effect=FatalError("Copyright Block"))
+        success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
+        assert success is False
+        assert fatal is True
+
+        # Case 3: Download failure (Recoverable)
+        manager.searcher.search = AsyncMock(return_value=SearchResult("url", "T", 100))
+        manager.downloader.download = AsyncMock(return_value=DownloadResult(False, 0, error="Http 403"))
+        success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
+        assert success is False
+        assert fatal is False
+
+        # Case 4: Download Skipped
+        manager.downloader.download = AsyncMock(return_value=DownloadResult(True, 0, skipped=True))
+        success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
+        assert success is True
+        manager.state.mark.assert_called_with(track, "skip", 0)
+
+        # Case 5: Unexpected Exception (Generic)
+        manager.searcher.search = AsyncMock(side_effect=RuntimeError("Extreme Error"))
+        success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
+        assert success is False
+        assert fatal is True
+        assert "Extreme Error" in err

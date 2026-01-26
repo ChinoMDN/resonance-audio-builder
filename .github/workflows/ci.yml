@@ -46,7 +46,7 @@ jobs:
           cache: "pip"
 
       - name: Install linters
-        run: pip install flake8 black isort mypy pylint
+        run: pip install flake8 black==24.1.1 isort==5.13.2 mypy pylint
 
       - name: Check formatting with Black
         run: black --check --diff src/
