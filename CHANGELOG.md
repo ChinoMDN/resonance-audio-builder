@@ -7,6 +7,14 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [8.2.2] – 2026-01-26
+
+### Fixed
+
+- **CI Formatting Violations:** Resolved conflicting `black` styling rules between local and CI environments by enforcing strict adherence to `black 24.1.1` standards.
+- **Windows Build Stabilization:** Addressed formatting issues that were causing CI failures on the Windows build pipeline.
+- **Documentation:** Updated CI badges and README to reflect the stable build status.
+
 ## [8.2.1] – 2026-01-25
 
 ### Fixed
