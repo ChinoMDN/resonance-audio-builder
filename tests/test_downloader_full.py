@@ -111,7 +111,7 @@ class TestDownloaderFull:
             mock_ydl.extract_info.assert_called()
 
     @pytest.mark.asyncio
-    async def test_download_via_ytdlp_download_error(self, downloader, tmp_path):
+    async def test_download_via_ytdlp_download_error(self, downloader):
         """Test download failure handling"""
         from resonance_audio_builder.core.exceptions import YouTubeError
 

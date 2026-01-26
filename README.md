@@ -110,7 +110,7 @@ Choose between **High Quality (320kbps)**, **Mobile (96kbps)**, or **Both**. The
 
 ## Testing
 
-Version 8.2.0 features a comprehensive test suite (170+ tests). To run the tests, install the development dependencies and use `pytest`:
+Version 8.2.1 features a comprehensive test suite (170+ tests). To run the tests, install the development dependencies and use `pytest`:
 
 ```bash
 pip install -r requirements-dev.txt

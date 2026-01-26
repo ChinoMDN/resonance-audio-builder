@@ -28,13 +28,18 @@ class TestManagerFullCoverage:
         ):
 
             mgr = DownloadManager(cfg, MagicMock())
-            # Use MagicMock by default to avoid AsyncMock unawaited warnings in discovery/unused tests
-            mgr.searcher.search = MagicMock()
-            mgr.downloader.download = MagicMock()
+            # Ensure all components that could return coroutines are MagicMocks
+            # unless explicitly needed for an async test
+            mgr.searcher = MagicMock()
+            mgr.downloader = MagicMock()
+            mgr.state = MagicMock()
+            mgr.ui = MagicMock()
+            mgr.keyboard = MagicMock()
+            mgr.log = MagicMock()
+            
             mgr.state.is_done.return_value = False
             mgr.keyboard.should_quit.return_value = False
             mgr.keyboard.is_paused.return_value = False
-            mgr.ui = MagicMock()
             return mgr
 
     @pytest.mark.asyncio

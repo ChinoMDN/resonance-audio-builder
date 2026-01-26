@@ -89,9 +89,8 @@ jobs:
 
       - name: Run Bandit (code security)
         run: |
-          bandit -r src/ -f json -o bandit-report.json
+          bandit -r src/ -f json -o bandit-report.json || true
           bandit -r src/ --severity-level medium --confidence-level medium
-        # No || true here
 
       - name: Check dependencies with Safety
         run: safety check --json > safety-report.json

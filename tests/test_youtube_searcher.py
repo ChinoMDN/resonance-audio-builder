@@ -22,15 +22,7 @@ class TestYouTubeSearcher:
             mock_cache.get.return_value = None
 
             searcher = YouTubeSearcher(MagicMock(), MagicMock(), mock_cache)
-
-            # Patch run_in_executor only on the current loop
-            import asyncio
-            loop = asyncio.get_event_loop()
-            async def mock_run(executor, func, *args):
-                return func(*args)
-
-            with patch.object(loop, "run_in_executor", new=mock_run):
-                yield searcher
+            yield searcher
 
     @pytest.mark.asyncio
     async def test_search_by_text_success(self, searcher, mock_youtube_api):
@@ -77,9 +69,6 @@ class TestYouTubeSearcher:
     @pytest.mark.asyncio
     async def test_search_network_error(self, searcher, mock_youtube_api):
         """Network error should be handled"""
-        # Our implementation returns None on Exception in _lookup -> raises NotFound if all fail
-        # Or raises RecoverableError?
-        # youtube.py Line 84 raises NotFoundError if loop finishes.
         mock_youtube_api.extract_info.side_effect = Exception("Network Down")
 
         track = TrackMetadata("id5", "Query", "Artist")

@@ -7,6 +7,15 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
+## [8.2.1] – 2026-01-25
+
+### Fixed
+
+- **CI Stabilization:** Resolved `OSError` and event loop teardown failures on Unix-based systems (Linux/macOS) by implementing a robust `cleanup_tasks` fixture in the test suite.
+- **Code Quality:** Significantly reduced cyclomatic complexity in `DownloadManager` by refactoring monolithic methods into smaller, testable units.
+- **Linter Compliance:** Fixed all remaining Flake8 violations, including line length (E501) and unused imports across the core library and tests.
+- **Security Reporting:** Optimized Bandit execution in CI to generate reports without blocking the pipeline on low-severity findings.
+
 ## [8.2.0] – 2026-01-25
 
 ### Added

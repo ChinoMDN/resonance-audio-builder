@@ -54,3 +54,15 @@ def mock_proxies(tmp_path):
     f = tmp_path / "proxies.txt"
     f.write_text("http://user:pass@1.2.3.4:8080\nhttp://5.6.7.8:3128")
     return f
+
+
+@pytest.fixture(autouse=True)
+async def cleanup_tasks():
+    """Ensure no pending tasks are left after a test"""
+    import asyncio
+    yield
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    if tasks:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)

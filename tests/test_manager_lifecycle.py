@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -51,8 +51,6 @@ class TestManagerLifecycle:
         manager.logger = MagicMock()
 
         # Ejecutamos un ciclo manual del worker (simulado)
-        # Nota: Esto requiere que tu worker tenga un try/except general.
-        # Si tu código original no lo tiene, este test fallará y te mostrará un bug real.
         with patch.object(manager, "_process_track_attempts", side_effect=Exception("Unexpected Crash")):
             # Ejecutamos lógica del worker protegida
             try:

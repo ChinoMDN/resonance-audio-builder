@@ -14,11 +14,19 @@ from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.audio.tagging import MetadataWriter
 from resonance_audio_builder.audio.youtube import YouTubeSearcher
 from resonance_audio_builder.core.config import Config, QualityMode
-from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
+from resonance_audio_builder.core.exceptions import (
+    FatalError,
+    RecoverableError,
+)
 from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import RichUI, clear_screen, console, print_header
+from resonance_audio_builder.core.ui import (
+    RichUI,
+    clear_screen,
+    console,
+    print_header,
+)
 from resonance_audio_builder.core.utils import export_m3u, save_history
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager
@@ -40,7 +48,9 @@ class DownloadManager:
         self.proxy_manager = SmartProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
 
         self.downloader = AudioDownloader(self.cfg, self.log, self.proxy_manager)
-        self.searcher = YouTubeSearcher(self.cfg, self.log, self.cache, self.proxy_manager)
+        self.searcher = YouTubeSearcher(
+            self.cfg, self.log, self.cache, self.proxy_manager
+        )
         self.metadata_writer = MetadataWriter(self.log)
         self.keyboard = KeyboardController(self.log)
 
@@ -139,7 +149,9 @@ class DownloadManager:
             pending_count += 1
 
         if pending_count > 20:
-            table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
+            table.add_row(
+                "...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]"
+            )
 
         console.print(Panel(table, border_style="blue"))
 
@@ -156,7 +168,6 @@ class DownloadManager:
 
     async def _process_track_attempts(self, track: TrackMetadata, task_id: str) -> bool:
         """Maneja los reintentos para una canción específica con gestión de errores detallada"""
-        # Idempotency check
         if self.state.is_done(track.track_id):
             self.ui.add_log(f"Track {track.title} already done. Skipping.")
             return True
@@ -167,50 +178,70 @@ class DownloadManager:
             if self.keyboard.should_quit():
                 return False
             attempt += 1
-            try:
-                # 1. Search
-                self.ui.update_task_status(task_id, "[cyan]Searching...[/cyan]")
-                search_result = await self.searcher.search(track)
-
-                # 2. Download
-                self.ui.update_task_status(task_id, "[blue]Downloading...[/blue]")
-                subfolder = getattr(track, "playlist_subfolder", "")
-                result = await self.downloader.download(
-                    search_result, track, lambda: self.keyboard.should_quit(), subfolder=subfolder
-                )
-
-                if not result.success:
-                    raise RecoverableError(result.error or "Unknown error")
-
-                # Success logic
-                status = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
-                self.ui.update_task_status(task_id, status)
-                self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
-                self.ui.update_main_progress(1)
+            
+            success, is_fatal, error = await self._attempt_download_iteration(track, task_id, attempt)
+            if success:
                 return True
-
-            except FatalError as e:
-                last_error = str(e)
-                self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+            
+            last_error = error
+            if is_fatal:
                 break
-            except RecoverableError as e:
-                last_error = str(e)
-                self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
-                if attempt < self.cfg.MAX_RETRIES:
-                    await asyncio.sleep(2 * attempt)
-            except Exception as e:
-                last_error = str(e)
-                self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
-                self.log.debug(f"Unexpected error for {track.title}: {traceback.format_exc()}")
-                break
+            
+            if attempt < self.cfg.MAX_RETRIES:
+                await asyncio.sleep(2 * attempt)
 
-        # If we reach here, it failed
         if not self.keyboard.should_quit():
             self.ui.update_task_status(task_id, f"[red]Failed: {last_error}[/red]")
             self.state.mark(track, "error", error=last_error)
             self.ui.update_main_progress(1)
             self.failed_tracks.append((track, last_error))
         return False
+
+    async def _attempt_download_iteration(
+        self, track: TrackMetadata, task_id: str, attempt: int
+    ) -> tuple[bool, bool, str]:
+        """Realiza un único intento de búsqueda y descarga. Retorna (success, is_fatal, error_msg)"""
+        try:
+            # 1. Search
+            self.ui.update_task_status(
+                task_id, f"[cyan]Searching (Attempt {attempt})...[/cyan]"
+            )
+            search_result = await self.searcher.search(track)
+
+            # 2. Download
+            self.ui.update_task_status(task_id, "[blue]Downloading...[/blue]")
+            subfolder = getattr(track, "playlist_subfolder", "")
+            result = await self.downloader.download(
+                search_result,
+                track,
+                lambda: self.keyboard.should_quit(),
+                subfolder=subfolder,
+            )
+
+            if not result.success:
+                raise RecoverableError(result.error or "Unknown error")
+
+            # Success logic
+            status = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
+            self.ui.update_task_status(task_id, status)
+            self.state.mark(
+                track, "skip" if result.skipped else "ok", result.bytes
+            )
+            self.ui.update_main_progress(1)
+            return True, False, ""
+
+        except FatalError as e:
+            self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+            return False, True, str(e)
+        except RecoverableError as e:
+            self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
+            return False, False, str(e)
+        except Exception as e:
+            self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+            self.log.debug(
+                f"Unexpected error for {track.title}: {traceback.format_exc()}"
+            )
+            return False, True, str(e)
 
     async def _worker(self):
         """Async worker modularizado"""

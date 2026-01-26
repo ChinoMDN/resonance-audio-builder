@@ -1,5 +1,5 @@
-# import asyncio (removed)
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -113,7 +113,7 @@ class TestAudioDownloader:
     def test_build_ffmpeg_cmd(self, downloader):
         in_p = Path("in.webm")
         out_p = Path("out.mp3")
-        cmd = downloader._build_ffmpeg_cmd(in_p, out_p, "320")
+        downloader._build_ffmpeg_cmd(in_p, out_p, "320")
 
     @pytest.mark.asyncio
     async def test_check_fake_hq(self, downloader, tmp_path):
