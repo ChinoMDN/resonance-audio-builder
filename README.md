@@ -94,6 +94,9 @@ pip install -r requirements.txt
 
 Export your playlist to a **CSV file** and place it in the `Playlists/` directory. Ensure it has at least `Artist` and `Title` columns.
 
+> [!TIP]
+> We highly recommend using **[Exportify](https://exportify.app/)** for Spotify playlists. It correctly includes **Album Art** URL columns (which this tool uses) and produces a format that is fully compatible with our testing.
+
 #### Step B: Start the builder
 
 You can run the application in three ways:
