@@ -17,9 +17,10 @@ class TestRichUI:
             assert ui.live is not None
             assert mock_live.called
 
+            mock_instance = ui.live
             ui.stop()
             # stop() calls self.live.stop()
-            assert ui.live.stop.called
+            assert mock_instance.stop.called
 
     def test_add_download_task(self, ui):
         ui.start(1)
@@ -29,7 +30,7 @@ class TestRichUI:
 
         tid = ui.add_download_task("Artist", "Title")
         assert tid == "id123"
-        assert ui.active_tasks["id123"]["artist"] == "Artist"
+        assert ui.active_tasks["id123"].artist == "Artist"
 
     def test_update_task_status(self, ui):
         ui.job_progress = MagicMock()

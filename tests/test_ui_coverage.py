@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from resonance_audio_builder.core.ui import clear_screen, format_time, print_header
+from resonance_audio_builder.core.ui import format_time, print_header
 
 
 class TestUICoverage:
@@ -13,12 +13,7 @@ class TestUICoverage:
         assert format_time(60) == "1m 00s"
         assert format_time(3661) == "1h 01m"
 
-    def test_clear_screen_windows(self):
-        """Test clear screen on Windows"""
-        with patch("os.name", "nt"):
-            with patch("os.system") as mock_system:
-                clear_screen()
-                mock_system.assert_called_with("cls")
+
 
     def test_print_header(self):
         """Test header printing"""
