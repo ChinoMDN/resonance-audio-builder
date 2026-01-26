@@ -168,6 +168,8 @@ jobs:
             --cov-report=html \
             --cov-report=term-missing \
             --cov-fail-under=${{ env.MIN_COVERAGE }} \
+            --junitxml=junit.xml \
+            -o junit_family=legacy \
             --maxfail=5 \
             --timeout=300 \
             --tb=short
@@ -180,6 +182,12 @@ jobs:
       - name: Upload coverage reports to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
         uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION }}
+        uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
