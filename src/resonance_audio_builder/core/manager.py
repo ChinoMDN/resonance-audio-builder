@@ -48,9 +48,7 @@ class DownloadManager:
         self.proxy_manager = SmartProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
 
         self.downloader = AudioDownloader(self.cfg, self.log, self.proxy_manager)
-        self.searcher = YouTubeSearcher(
-            self.cfg, self.log, self.cache, self.proxy_manager
-        )
+        self.searcher = YouTubeSearcher(self.cfg, self.log, self.cache, self.proxy_manager)
         self.metadata_writer = MetadataWriter(self.log)
         self.keyboard = KeyboardController(self.log)
 
@@ -149,9 +147,7 @@ class DownloadManager:
             pending_count += 1
 
         if pending_count > 20:
-            table.add_row(
-                "...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]"
-            )
+            table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
 
         console.print(Panel(table, border_style="blue"))
 
@@ -178,15 +174,15 @@ class DownloadManager:
             if self.keyboard.should_quit():
                 return False
             attempt += 1
-            
+
             success, is_fatal, error = await self._attempt_download_iteration(track, task_id, attempt)
             if success:
                 return True
-            
+
             last_error = error
             if is_fatal:
                 break
-            
+
             if attempt < self.cfg.MAX_RETRIES:
                 await asyncio.sleep(2 * attempt)
 
@@ -203,9 +199,7 @@ class DownloadManager:
         """Realiza un único intento de búsqueda y descarga. Retorna (success, is_fatal, error_msg)"""
         try:
             # 1. Search
-            self.ui.update_task_status(
-                task_id, f"[cyan]Searching (Attempt {attempt})...[/cyan]"
-            )
+            self.ui.update_task_status(task_id, f"[cyan]Searching (Attempt {attempt})...[/cyan]")
             search_result = await self.searcher.search(track)
 
             # 2. Download
@@ -224,9 +218,7 @@ class DownloadManager:
             # Success logic
             status = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
             self.ui.update_task_status(task_id, status)
-            self.state.mark(
-                track, "skip" if result.skipped else "ok", result.bytes
-            )
+            self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
             self.ui.update_main_progress(1)
             return True, False, ""
 
@@ -238,9 +230,7 @@ class DownloadManager:
             return False, False, str(e)
         except Exception as e:
             self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
-            self.log.debug(
-                f"Unexpected error for {track.title}: {traceback.format_exc()}"
-            )
+            self.log.debug(f"Unexpected error for {track.title}: {traceback.format_exc()}")
             return False, True, str(e)
 
     async def _worker(self):

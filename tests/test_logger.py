@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
+
 from resonance_audio_builder.core.logger import Logger
+
 
 class TestLogger:
     def test_logger_info(self):

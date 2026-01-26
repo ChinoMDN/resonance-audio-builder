@@ -1,5 +1,7 @@
 from unittest.mock import patch
+
 from resonance_audio_builder.audio.lyrics import fetch_lyrics
+
 
 class TestLyrics:
     def test_fetch_lyrics_success(self):

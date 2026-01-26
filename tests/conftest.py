@@ -60,6 +60,7 @@ def mock_proxies(tmp_path):
 async def cleanup_tasks():
     """Ensure no pending tasks are left after a test"""
     import asyncio
+
     yield
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     if tasks:

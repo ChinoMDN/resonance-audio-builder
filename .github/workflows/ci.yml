@@ -96,7 +96,7 @@ jobs:
         run: safety check --json > safety-report.json
 
       - name: Audit with pip-audit
-        run: pip-audit --require-hashes --desc > pip-audit-report.txt
+        run: pip-audit -r requirements.txt --require-hashes --desc > pip-audit-report.txt
 
       - name: Upload Security Reports
         if: always()
@@ -179,7 +179,7 @@ jobs:
           coverage-badge -o coverage.svg -f
 
       - name: Upload coverage reports to Codecov
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION }}
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -191,7 +191,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload HTML coverage report
-        if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
+        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report

@@ -1,5 +1,4 @@
 import threading
-
 from unittest.mock import patch
 
 from resonance_audio_builder.network.limiter import RateLimiter

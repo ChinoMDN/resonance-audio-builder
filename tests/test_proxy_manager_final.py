@@ -1,5 +1,4 @@
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from resonance_audio_builder.network.proxies import ProxyStats, SmartProxyManager
 
