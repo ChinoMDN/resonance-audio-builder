@@ -86,3 +86,24 @@ class CacheManager:
                 return self.cursor.fetchone()[0]
             except Exception:
                 return 0
+
+    def __del__(self):
+        """Cleanup: close connection when object is destroyed"""
+        if hasattr(self, 'conn'):
+            try:
+                self.conn.close()
+            except:
+                pass
+
+    def close(self):
+        """Explicit close method"""
+        if self.conn:
+            self.conn.close()
+
+    def __enter__(self):
+        """Context manager support"""
+        return self
+
+    def __exit__(self, *args):
+        """Context manager cleanup"""
+        self.close()

@@ -156,6 +156,11 @@ class DownloadManager:
 
     async def _process_track_attempts(self, track: TrackMetadata, task_id: str) -> bool:
         """Maneja los reintentos para una canción específica con gestión de errores detallada"""
+        # Idempotency check
+        if self.state.is_done(track.track_id):
+            self.ui.add_log(f"Track {track.title} already done. Skipping.")
+            return True
+
         attempt = 0
         last_error = ""
         while attempt < self.cfg.MAX_RETRIES:

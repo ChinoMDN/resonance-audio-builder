@@ -1,4 +1,6 @@
 import threading
+from unittest.mock import patch
+import time
 
 from resonance_audio_builder.network.limiter import RateLimiter
 
@@ -8,6 +10,16 @@ class TestRateLimiter:
         """Initial delay should be min_delay"""
         rl = RateLimiter(min_delay=1.0, max_delay=5.0)
         assert rl.current_delay == 1.0
+
+    @patch("time.sleep")
+    def test_wait(self, mock_sleep):
+        """Wait calls sleep with current delay + jitter"""
+        rl = RateLimiter(min_delay=1.0)
+        rl.wait()
+        assert mock_sleep.called
+        # Check that it slept for at least min_delay (jitter is 0 to 0.5)
+        args, _ = mock_sleep.call_args
+        assert args[0] >= 1.0
 
     def test_success_reduces_delay(self):
         """Success reduces delay"""

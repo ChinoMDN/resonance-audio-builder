@@ -72,6 +72,11 @@ desktop.ini
 .pytest_cache/
 .coverage
 htmlcov/
+tests_v*.txt
+tests_pause.txt
+tests_run_flow.txt
+coverage_report_final_v*.txt
+final_coverage_report.txt
 
 # Build specs
 *.spec

@@ -7,7 +7,15 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [8.1.0] – 2026-01-25
+## [8.2.0] – 2026-01-25
+
+### Added
+
+- **High-Coverage Test Suite (76%):** Achieved 75%+ test coverage milestone across all core modules.
+- **Improved Mocking Architecture:** Refined unit tests for `downloader` and `manager` with deterministic async mocks.
+- **Clean Dev Environment:** Silenced Python 3.13 `RuntimeWarnings` and tightened `.gitignore` for test artifacts.
+
+### [8.1.0] – 2026-01-25
 
 ### Added
 

@@ -19,7 +19,7 @@ class TestYouTubeSearcher:
 
         with (
             patch("resonance_audio_builder.audio.youtube.yt_dlp.YoutubeDL", return_value=mock_youtube_api),
-            patch("asyncio.AbstractEventLoop.run_in_executor", new=mock_run),
+            patch("asyncio.AbstractEventLoop.run_in_executor", new=mock_run)
         ):
             # Ensure cache doesn't return mocks that act as True
             mock_cache = MagicMock()

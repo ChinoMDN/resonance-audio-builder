@@ -1,0 +1,8 @@
+[run]
+branch = True
+source = src/resonance_audio_builder
+omit =
+    src/resonance_audio_builder/__main__.py
+    src/resonance_audio_builder/cli.py
+    src/resonance_audio_builder/watch/*
+    tests/*
