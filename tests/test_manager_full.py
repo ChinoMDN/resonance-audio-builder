@@ -188,7 +188,7 @@ class TestManagerFullCoverage:
         manager.state.is_done.side_effect = lambda tid: tid == "id1"
 
         with (
-            patch("resonance_audio_builder.core.manager.console.print") as mock_print,
+            patch("resonance_audio_builder.core.manager.console.print"),
             patch("resonance_audio_builder.core.manager.Panel"),
             patch("resonance_audio_builder.core.manager.Table") as mock_table,
         ):
