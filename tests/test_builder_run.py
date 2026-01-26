@@ -28,7 +28,6 @@ class TestAppFull:
             patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["4"]),
             patch("resonance_audio_builder.core.builder.console.print"),
             patch("resonance_audio_builder.core.builder.print_header"),
-
             patch("resonance_audio_builder.core.builder.App._show_status"),
         ):
 

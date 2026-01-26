@@ -37,7 +37,6 @@ class TestApp:
             patch("resonance_audio_builder.core.builder.console.print"),
             patch("resonance_audio_builder.core.builder.Prompt.ask", return_value="0"),
             patch("resonance_audio_builder.core.builder.print_header"),
-
         ):
 
             res = app._select_csv()

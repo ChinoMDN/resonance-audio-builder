@@ -220,9 +220,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
           pip install -e .
-          pip install pytest
 
       - name: Run integration tests
         run: pytest tests/test_integration_pipeline.py -v --tb=short
@@ -262,6 +261,7 @@ jobs:
           pip install pyinstaller
 
       - name: Build Executable
+        shell: bash
         run: |
           pyinstaller --clean --onefile \
             --name "ResonanceMusicBuilder" \

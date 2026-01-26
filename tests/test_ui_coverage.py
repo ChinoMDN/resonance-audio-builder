@@ -13,8 +13,6 @@ class TestUICoverage:
         assert format_time(60) == "1m 00s"
         assert format_time(3661) == "1h 01m"
 
-
-
     def test_print_header(self):
         """Test header printing"""
         with patch("resonance_audio_builder.core.ui.console.print") as mock_print:
