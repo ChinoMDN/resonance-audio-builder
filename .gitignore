@@ -77,6 +77,11 @@ tests_pause.txt
 tests_run_flow.txt
 coverage_report_final_v*.txt
 final_coverage_report.txt
+bandit-report.json
+safety-report.json
+pip-audit-report.txt
+junit.xml
+coverage.xml
 
 # Build specs
 *.spec
