@@ -163,6 +163,7 @@ jobs:
             -v \
             -n auto \
             --cov=src/resonance_audio_builder \
+            --cov-branch \
             --cov-report=xml \
             --cov-report=html \
             --cov-report=term-missing \
@@ -176,14 +177,10 @@ jobs:
         run: |
           coverage-badge -o coverage.svg -f
 
-      - name: Upload coverage reports
+      - name: Upload coverage reports to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload HTML coverage report

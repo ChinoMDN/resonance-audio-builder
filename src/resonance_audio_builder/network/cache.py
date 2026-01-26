@@ -15,8 +15,7 @@ class CacheManager:
                 # check_same_thread=False allows sharing connection across threads if locked
                 self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
                 self.cursor = self.conn.cursor()
-                self.cursor.execute(
-                    """
+                self.cursor.execute("""
                     CREATE TABLE IF NOT EXISTS cache (
                         key TEXT PRIMARY KEY,
                         url TEXT,
@@ -24,8 +23,7 @@ class CacheManager:
                         duration INTEGER,
                         timestamp REAL
                     )
-                """
-                )
+                """)
                 self.conn.commit()
             except Exception as e:
                 print(f"[!] Cache DB Init Error: {e}")
@@ -89,10 +87,10 @@ class CacheManager:
 
     def __del__(self):
         """Cleanup: close connection when object is destroyed"""
-        if hasattr(self, 'conn'):
+        if hasattr(self, "conn"):
             try:
                 self.conn.close()
-            except:
+            except Exception:
                 pass
 
     def close(self):

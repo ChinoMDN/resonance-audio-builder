@@ -1,7 +1,10 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from resonance_audio_builder.audio.tagging import MetadataWriter
+
+import pytest
+
 from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.audio.tagging import MetadataWriter
+
 
 class TestMetadataWriter:
     @pytest.fixture
@@ -13,7 +16,7 @@ class TestMetadataWriter:
         f = tmp_path / "test.mp3"
         f.write_bytes(b"dummy mp3")
         track = TrackMetadata(track_id="id1", title="Title", artist="Artist", album="Album")
-        
+
         with patch.object(writer, "_load_audio") as mock_load:
             mock_load.return_value = MagicMock()
             with patch.object(writer, "_save_audio"):
@@ -24,7 +27,7 @@ class TestMetadataWriter:
         audio = MagicMock()
         track = TrackMetadata(track_id="id2", title="My Title", artist="My Artist", album="My Album")
         writer._add_text_tags(audio, track)
-        
+
         # Check calls to audio.tags.add
         added_tags = [call.args[0].__class__.__name__ for call in audio.tags.add.call_args_list]
         assert "TIT2" in added_tags
@@ -35,7 +38,7 @@ class TestMetadataWriter:
         audio = MagicMock()
         track = TrackMetadata(track_id="id3", title="T", artist="A")
         track.cover_url = "http://example.com/image.jpg"
-        
+
         with patch("requests.get") as mock_get:
             mock_get.return_value.status_code = 200
             mock_get.return_value.content = b"fake image"

@@ -159,8 +159,7 @@ class RichUI:
             with self.lock:
                 pending_count = len(self.active_tasks)
 
-            stats_txt = Text.from_markup(
-                f"""
+            stats_txt = Text.from_markup(f"""
 [bold]Configuration[/bold]
 Mode: {self.cfg.MODE}
 Workers: {self.cfg.MAX_WORKERS}
@@ -168,8 +167,7 @@ Proxies: {'Enabled' if self.cfg.USE_PROXIES else 'Disabled'}
 
 [bold]Session[/bold]
 Active Workers: {pending_count}
-    """
-            )
+    """)
             self.layout["stats"].update(Panel(stats_txt, title="Information", border_style="magenta"))
 
             return self.layout

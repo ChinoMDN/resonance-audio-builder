@@ -13,19 +13,24 @@ class TestYouTubeSearcher:
         # Patch yt_dlp.YoutubeDL at the import location in youtube.py
         mock_youtube_api.__enter__.return_value = mock_youtube_api
 
-        # We also mock run_in_executor to avoid thread leaks during teardown on Linux/macOS
-        async def mock_run(executor, func, *args):
-            return func(*args)
-
-        with (
-            patch("resonance_audio_builder.audio.youtube.yt_dlp.YoutubeDL", return_value=mock_youtube_api),
-            patch("asyncio.AbstractEventLoop.run_in_executor", new=mock_run)
+        with patch(
+            "resonance_audio_builder.audio.youtube.yt_dlp.YoutubeDL",
+            return_value=mock_youtube_api,
         ):
             # Ensure cache doesn't return mocks that act as True
             mock_cache = MagicMock()
             mock_cache.get.return_value = None
 
-            yield YouTubeSearcher(MagicMock(), MagicMock(), mock_cache)
+            searcher = YouTubeSearcher(MagicMock(), MagicMock(), mock_cache)
+
+            # Patch run_in_executor only on the current loop
+            import asyncio
+            loop = asyncio.get_event_loop()
+            async def mock_run(executor, func, *args):
+                return func(*args)
+
+            with patch.object(loop, "run_in_executor", new=mock_run):
+                yield searcher
 
     @pytest.mark.asyncio
     async def test_search_by_text_success(self, searcher, mock_youtube_api):

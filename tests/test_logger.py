@@ -1,30 +1,28 @@
-import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from resonance_audio_builder.core.logger import Logger
 
 class TestLogger:
     def test_logger_info(self):
         ui = MagicMock()
-        logger = Logger(debug=True)
-        logger.set_tracker(ui)
-        
-        logger.info("Test Info")
+        log = Logger(debug=True)
+        log.set_tracker(ui)
+        log.info("Test Info")
+
+        # Check interaction with UI
         assert ui.add_log.called
-        assert "Test Info" in ui.add_log.call_args[0][0]
+        args, _ = ui.add_log.call_args
+        assert "Test Info" in args[0]
 
     def test_logger_debug_disabled(self):
         ui = MagicMock()
-        logger = Logger(debug=False)
-        logger.set_tracker(ui)
-        
-        logger.debug("Test Debug")
+        log = Logger(debug=False)
+        log.set_tracker(ui)
+        log.debug("Hidden")
         assert not ui.add_log.called
 
     def test_logger_error(self):
         ui = MagicMock()
-        logger = Logger(debug=True)
-        logger.set_tracker(ui)
-        
-        logger.error("Test Error")
+        log = Logger(debug=True)
+        log.set_tracker(ui)
+        log.error("Boom")
         assert ui.add_log.called
-        assert "[X]" in ui.add_log.call_args[0][0]

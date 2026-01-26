@@ -1,6 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, Mock
-from resonance_audio_builder.core.ui import format_time, clear_screen, print_header
+
+from resonance_audio_builder.core.ui import clear_screen, format_time, print_header
+
 
 class TestUICoverage:
     def test_format_time_edge_cases(self):
@@ -12,45 +15,49 @@ class TestUICoverage:
 
     def test_clear_screen_windows(self):
         """Test clear screen on Windows"""
-        with patch('os.name', 'nt'):
-            with patch('os.system') as mock_system:
+        with patch("os.name", "nt"):
+            with patch("os.system") as mock_system:
                 clear_screen()
-                mock_system.assert_called_with('cls')
+                mock_system.assert_called_with("cls")
 
     def test_print_header(self):
         """Test header printing"""
-        with patch('resonance_audio_builder.core.ui.console.print') as mock_print:
+        with patch("resonance_audio_builder.core.ui.console.print") as mock_print:
             print_header()
             assert mock_print.called
+
 
 class TestInputCoverage:
     def test_handle_keys(self):
         """Test KeyboardController key handling"""
         from resonance_audio_builder.core.input import KeyboardController
+
         kb = KeyboardController(MagicMock())
-        
+
         # Test Pause toggle
         kb._handle_key("P")
         assert kb.is_paused()
         kb._handle_key("P")
         assert not kb.is_paused()
-        
+
         # Test Skip
         kb._handle_key("S")
         assert kb.should_skip()
-        assert not kb.should_skip() # clears after check
-        
+        assert not kb.should_skip()  # clears after check
+
         # Test Quit
         kb._handle_key("Q")
         assert kb.should_quit()
+
 
 class TestRichUICoverageBoost:
     def test_ui_methods(self):
         """Test various RichUI methods"""
         from resonance_audio_builder.core.ui import RichUI
+
         cfg = MagicMock()
         ui = RichUI(cfg)
-        
+
         # Patch the class itself to avoid global state issues
         with patch("resonance_audio_builder.core.ui.Live") as mock_live_cls:
             mock_live = mock_live_cls.return_value
@@ -63,16 +70,18 @@ class TestRichUICoverageBoost:
             ui.stop()
             assert mock_live.start.called
             assert mock_live.stop.called
-            
+
         # Test summary
-        with patch('resonance_audio_builder.core.ui.console.print') as mock_print:
+        with patch("resonance_audio_builder.core.ui.console.print") as mock_print:
             ui.show_summary({"ok": 1, "skip": 0, "error": 0, "bytes": 100})
             assert mock_print.called
+
 
 class TestDownloaderCoverageDeep:
     @pytest.fixture
     def downloader(self):
         from resonance_audio_builder.audio.downloader import AudioDownloader
+
         cfg = MagicMock()
         log = MagicMock()
         # Fix: 3rd arg is proxy_manager, not cache
@@ -82,7 +91,7 @@ class TestDownloaderCoverageDeep:
     async def test_download_cover_success(self, downloader):
         """Test successful cover download with actual fake data"""
         from unittest.mock import AsyncMock
-        
+
         # Mock aiohttp response
         mock_resp = MagicMock()
         mock_resp.status = 200
@@ -90,13 +99,13 @@ class TestDownloaderCoverageDeep:
         # Ensure __aenter__ returns the response
         mock_resp.__aenter__ = AsyncMock(return_value=mock_resp)
         mock_resp.__aexit__ = AsyncMock()
-        
+
         mock_session = MagicMock()
         mock_session.get.return_value = mock_resp
         # Ensure session __aenter__ returns the session
         mock_session.__aenter__ = AsyncMock(return_value=mock_session)
         mock_session.__aexit__ = AsyncMock()
-        
+
         with patch("aiohttp.ClientSession", return_value=mock_session):
             img = await downloader._download_cover("http://example.com/art.jpg")
             assert img == b"fake_image_data"

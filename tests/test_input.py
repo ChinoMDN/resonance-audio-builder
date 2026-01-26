@@ -1,8 +1,10 @@
-import pytest
-import threading
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
+
 
 class TestKeyboardController:
     @pytest.fixture
@@ -36,6 +38,6 @@ class TestKeyboardController:
             controller.start()
             assert controller._running is True
             assert mock_thread.called
-            
+
             controller.stop()
             assert controller._running is False
