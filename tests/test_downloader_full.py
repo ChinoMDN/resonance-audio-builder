@@ -48,20 +48,6 @@ class TestDownloaderFull:
         original_bytes = buffer.getvalue()
         original_size = len(original_bytes)
 
-        # Test resize to smaller dimensions
-        # _resize_cover is async? In downloader.py it is `async def _resize_cover`.
-        # User fix `def test_resize_cover` is sync and calls it sync?
-        # Downloader code (Viewed step 418):
-        # 106: async def _resize_cover(...)
-        # 109: return await loop.run_in_executor(None, self._resize_cover_sync, ...)
-        # 111: def _resize_cover_sync(...)
-
-        # So I should test `_resize_cover_sync` directly if I want sync test, OR call async wrapper.
-        # User fixture `downloader` in test_downloader_full uses `AudioDownloader`.
-        # User code calls `downloader._resize_cover(...)`.
-        # If it's async, this will return a coroutine and fail assertion.
-        # I will change it to `_resize_cover_sync` which IS sync and contains the logic.
-
         resized_bytes = downloader._resize_cover_sync(original_bytes, max_size=50)
 
         # Assertions
@@ -90,8 +76,10 @@ class TestDownloaderFull:
             success = await downloader._transcode(input_file, output_file, "192")
             assert success is True
             mock_exec.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_download_raw_full(self, downloader, tmp_path):
         """Test full flow of _download_raw -> _execute_ydl"""
-        track = TrackMetadata("id1", "Song", "Artist")
         dl_path = tmp_path / "downloads"
         dl_path.mkdir()
 
@@ -118,8 +106,6 @@ class TestDownloaderFull:
         with patch("yt_dlp.YoutubeDL") as mock_ydl_cls:
             mock_ydl = mock_ydl_cls.return_value
             mock_ydl.__enter__.return_value = mock_ydl
-            # Simulate error in extract_info logic wrap
-            # But the test calls _execute_ydl via run_in_executor
 
             # Just verify _download_raw re-raises if execute_ydl fails
             with patch(

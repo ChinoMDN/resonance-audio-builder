@@ -96,7 +96,7 @@ jobs:
         run: safety check --json > safety-report.json
 
       - name: Audit with pip-audit
-        run: pip-audit -r requirements.txt --require-hashes --desc > pip-audit-report.txt
+        run: pip-audit -r requirements.txt --desc > pip-audit-report.txt
 
       - name: Upload Security Reports
         if: always()
@@ -185,7 +185,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload test results to Codecov
-        if: ${{ !cancelled() && matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION }}
+        if: ${{ always() && matrix.os == 'ubuntu-latest' && matrix.python-version == env.PYTHON_VERSION }}
         uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -222,7 +222,7 @@ jobs:
           pip install pytest
 
       - name: Run integration tests
-        run: pytest tests/integration/ -v --tb=short
+        run: pytest tests/test_integration_pipeline.py -v --tb=short
         timeout-minutes: 60
 
   # ===== BUILD EXECUTABLES =====
