@@ -14,19 +14,11 @@ from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.audio.tagging import MetadataWriter
 from resonance_audio_builder.audio.youtube import YouTubeSearcher
 from resonance_audio_builder.core.config import Config, QualityMode
-from resonance_audio_builder.core.exceptions import (
-    FatalError,
-    RecoverableError,
-)
+from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
 from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import (
-    RichUI,
-    clear_screen,
-    console,
-    print_header,
-)
+from resonance_audio_builder.core.ui import RichUI, clear_screen, console, print_header
 from resonance_audio_builder.core.utils import export_m3u, save_history
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager
