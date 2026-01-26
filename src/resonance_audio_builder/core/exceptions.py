@@ -55,7 +55,9 @@ class GeoBlockError(FatalError):
 class YouTubeError(DownloadError):
     """Wrapper para errores de yt-dlp con clasificación inteligente"""
 
-    def __init__(self, original_error: Exception):
+    def __init__(self, original_error: Exception | str):
+        if isinstance(original_error, str):
+            original_error = Exception(original_error)
         self.original_error = original_error
         self.status_code = self._extract_status(original_error)
         self.error_type = self._classify_error(original_error)

@@ -7,7 +7,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 import aiohttp
 import yt_dlp
@@ -42,7 +42,7 @@ class DownloadResult:
 
 
 class AudioDownloader:
-    def __init__(self, config: Config, logger: Logger, proxy_manager: SmartProxyManager = None):
+    def __init__(self, config: Config, logger: Logger, proxy_manager: Optional[SmartProxyManager] = None):
         self.cfg = config
         self.log = logger
         self._cookies_valid = validate_cookies_file(config.COOKIES_FILE)
@@ -424,7 +424,7 @@ class AudioDownloader:
             pass
         return None
 
-    def _handle_ytdlp_error(self, e: Exception, proxy: Optional[str]):
+    def _handle_ytdlp_error(self, e: Exception, proxy: Optional[str]) -> NoReturn:
         if self.proxy_manager and proxy:
             self.proxy_manager.mark_failure(proxy)
 

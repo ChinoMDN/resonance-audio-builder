@@ -17,7 +17,7 @@ from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.manager import DownloadManager
 from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import clear_screen, console, print_header
+from resonance_audio_builder.core.ui import console, print_header
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.limiter import RateLimiter
 from resonance_audio_builder.network.utils import validate_cookies_file
@@ -83,7 +83,7 @@ class App:
         console.print(grid)
 
     def _select_csv(self) -> List[str]:
-        clear_screen()
+        console.clear()
         print_header()
 
         # Ensure input folder exists
@@ -133,7 +133,7 @@ class App:
         return [csvs[int(sel) - 1]]
 
     def _select_quality(self):
-        clear_screen()
+        console.clear()
         print_header()
 
         grid = Table.grid(expand=True, padding=(0, 2))
@@ -206,7 +206,7 @@ class App:
         if csv_files is not None:
             return csv_files
 
-        clear_screen()
+        console.clear()
         print_header()
         return self._select_csv()
 
@@ -242,7 +242,7 @@ class App:
 
     def _retry_failed(self):
         """Reintenta descargar canciones fallidas"""
-        clear_screen()
+        console.clear()
         print_header()
 
         if not os.path.exists(self.cfg.ERROR_CSV):
@@ -317,7 +317,7 @@ class App:
 
     def _clear_cache(self):
         """Menú de limpieza modular"""
-        clear_screen()
+        console.clear()
         print_header()
         table = Table(title="Clear Data", show_header=False, box=None)
         rows = [("[1]", "Clear Search Cache"), ("[2]", "Clear Progress"), ("[3]", "Clear All"), ("[0]", "Cancel")]
@@ -361,7 +361,7 @@ class App:
             print(f"[!] Folder not found: {folder}")
             return
 
-        clear_screen()
+        console.clear()
         print_header()
 
         # Preguntar calidad UNA sola vez al inicio
@@ -392,7 +392,7 @@ class App:
             return
 
         while True:
-            clear_screen()
+            console.clear()
             print_header()
 
             self._show_status()

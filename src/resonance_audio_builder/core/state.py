@@ -2,7 +2,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.core.config import Config
@@ -53,7 +53,7 @@ class ProgressDB:
             conn.commit()
             conn.close()
 
-    def mark(self, track: TrackMetadata, status: str, bytes_n: int = 0, error: str = None):
+    def mark(self, track: TrackMetadata, status: str, bytes_n: int = 0, error: Optional[str] = None):
         """Registra progreso de una descarga"""
         with self.lock:
             conn = sqlite3.connect(self.db_path)
@@ -132,7 +132,7 @@ class ProgressDB:
 
             for row in cursor:
                 # Reconstruir métadatos mínimos para reintento
-                track = TrackMetadata(artist=row[0], title=row[1])
+                track = TrackMetadata(track_id=row[2], artist=row[0], title=row[1])
                 tracks.append(track)
             conn.close()
         return tracks

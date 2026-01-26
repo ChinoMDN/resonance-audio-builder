@@ -15,7 +15,7 @@ def fetch_lyrics(artist: str, title: str, duration_sec: int = 0) -> Optional[str
     # 1. Intentar LRCLIB (letras sincronizadas .lrc)
     try:
         url = "https://lrclib.net/api/get"
-        params = {
+        params: dict[str, str | int] = {
             "artist_name": clean_artist,
             "track_name": clean_title,
         }

@@ -27,7 +27,11 @@ class SearchResult:
 
 class YouTubeSearcher:
     def __init__(
-        self, config: Config, logger: Logger, cache_manager: CacheManager, proxy_manager: SmartProxyManager = None
+        self,
+        config: Config,
+        logger: Logger,
+        cache_manager: CacheManager,
+        proxy_manager: Optional[SmartProxyManager] = None,
     ):
         self.cfg = config
         self.log = logger

@@ -18,7 +18,7 @@ from resonance_audio_builder.core.exceptions import FatalError, RecoverableError
 from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.state import ProgressDB
-from resonance_audio_builder.core.ui import RichUI, clear_screen, console, print_header
+from resonance_audio_builder.core.ui import RichUI, console, print_header
 from resonance_audio_builder.core.utils import export_m3u, save_history
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager
@@ -45,7 +45,7 @@ class DownloadManager:
         self.keyboard = KeyboardController(self.log)
 
         console.clear()
-        self.queue = asyncio.Queue()
+        self.queue: asyncio.Queue[TrackMetadata] = asyncio.Queue()
         self.failed_tracks: List[Tuple[TrackMetadata, str]] = []
 
     async def run(self, tracks: List[TrackMetadata]):
@@ -57,7 +57,7 @@ class DownloadManager:
             print("\n✓ ¡Todas las canciones ya están descargadas!")
             return
 
-        clear_screen()
+        console.clear()
         print_header()
         self._print_batch_summary(tracks, pending)
 

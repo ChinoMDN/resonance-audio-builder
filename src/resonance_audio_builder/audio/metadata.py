@@ -1,5 +1,6 @@
 import hashlib
 from dataclasses import dataclass, field
+from typing import Optional
 
 
 @dataclass
@@ -16,6 +17,7 @@ class TrackMetadata:
     spotify_uri: str = ""
     cover_url: str = ""
     duration_ms: int = 0
+    cover_data: Optional[bytes] = None
     raw_data: dict = field(default_factory=dict)
 
     @classmethod
