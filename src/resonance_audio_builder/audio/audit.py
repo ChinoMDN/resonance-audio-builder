@@ -42,49 +42,46 @@ class AudioAuditor:
 
     def _audit_folder(self, folder_path: Path, check_spectral: bool = False) -> AuditResult:
         result = AuditResult()
-
-        # Get all mp3 files
         files = list(folder_path.rglob("*.mp3"))
         result.total_files = len(files)
 
         for file_path in files:
-            try:
-                # Size
-                file_size = file_path.stat().st_size
-                result.total_size_bytes += file_size
-
-                # Tag Check
-                try:
-                    audio = MP3(file_path, ID3=ID3)
-
-                    # Metadata check
-                    has_title = "TIT2" in audio
-                    has_artist = "TPE1" in audio
-                    if not has_title or not has_artist:
-                        result.missing_metadata.append(file_path.name)
-
-                    # Cover check
-                    has_cover = any(frame.startswith("APIC") for frame in audio.keys())
-                    if not has_cover:
-                        result.missing_covers.append(file_path.name)
-
-                    # Lyrics check
-                    has_lyrics = any(frame.startswith("USLT") for frame in audio.keys())
-                    if not has_lyrics:
-                        result.missing_lyrics.append(file_path.name)
-
-                except Exception as e:
-                    self.log.debug(f"Metadata error on {file_path.name}: {e}")
-                    result.errors.append(f"{file_path.name}: Tag Error")
-
-                # Spectral analysis
-                if check_spectral:
-                    is_genuine = self.analyzer.analyze_integrity(file_path)
-                    if not is_genuine:
-                        result.fake_hq_detected.append(file_path.name)
-
-            except Exception as e:
-                self.log.error(f"Error auditing {file_path}: {e}")
-                result.errors.append(str(file_path))
+            self._audit_single_file(file_path, result, check_spectral)
 
         return result
+
+    def _audit_single_file(self, file_path: Path, result: AuditResult, check_spectral: bool) -> None:
+        """Audit a single MP3 file and update result."""
+        try:
+            result.total_size_bytes += file_path.stat().st_size
+            self._check_file_tags(file_path, result)
+
+            if check_spectral:
+                self._check_spectral_integrity(file_path, result)
+
+        except Exception as e:
+            self.log.error(f"Error auditing {file_path}: {e}")
+            result.errors.append(str(file_path))
+
+    def _check_file_tags(self, file_path: Path, result: AuditResult) -> None:
+        """Check ID3 tags for metadata, cover, and lyrics."""
+        try:
+            audio = MP3(file_path, ID3=ID3)
+
+            if "TIT2" not in audio or "TPE1" not in audio:
+                result.missing_metadata.append(file_path.name)
+
+            if not any(frame.startswith("APIC") for frame in audio.keys()):
+                result.missing_covers.append(file_path.name)
+
+            if not any(frame.startswith("USLT") for frame in audio.keys()):
+                result.missing_lyrics.append(file_path.name)
+
+        except Exception as e:
+            self.log.debug(f"Metadata error on {file_path.name}: {e}")
+            result.errors.append(f"{file_path.name}: Tag Error")
+
+    def _check_spectral_integrity(self, file_path: Path, result: AuditResult) -> None:
+        """Check if file is genuine HQ using spectral analysis."""
+        if not self.analyzer.analyze_integrity(file_path):
+            result.fake_hq_detected.append(file_path.name)
