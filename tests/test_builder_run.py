@@ -27,8 +27,11 @@ class TestAppFull:
             patch.object(app, "_check_dependencies", return_value=True),
             patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["4", "n", "5"]),
             patch("resonance_audio_builder.core.builder.console.print"),
+            patch("resonance_audio_builder.core.builder.console.input"),
+            patch("resonance_audio_builder.core.builder.console.status"),
             patch("resonance_audio_builder.core.builder.print_header"),
             patch("resonance_audio_builder.core.builder.App._show_status"),
+            patch("resonance_audio_builder.core.builder.AudioAuditor"),
         ):
 
             app.run()
