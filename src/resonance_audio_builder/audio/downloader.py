@@ -302,8 +302,9 @@ class AudioDownloader:
     def _apply_basic_tags(self, audio: MP3, track: TrackMetadata):
         if track.title:
             audio.tags.add(TIT2(encoding=3, text=track.title))
-        if track.artist:
-            audio.tags.add(TPE1(encoding=3, text=track.artist))
+        # TPE1 soporta múltiples artistas como lista, haciéndolos seleccionables individualmente
+        if track.artists:
+            audio.tags.add(TPE1(encoding=3, text=track.artists))
         if track.album:
             audio.tags.add(TALB(encoding=3, text=track.album))
 

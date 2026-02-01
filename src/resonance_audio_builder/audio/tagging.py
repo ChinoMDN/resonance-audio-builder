@@ -16,9 +16,15 @@ class MetadataWriter:
 
     def _add_text_tags(self, audio, meta: TrackMetadata):
         """Aplica etiquetas de texto básicas"""
+        # TPE1 soporta múltiples artistas como lista, haciéndolos seleccionables individualmente
+        if meta.artists:
+            try:
+                audio.tags.add(TPE1(encoding=3, text=meta.artists))
+            except Exception as e:
+                self.log.debug(f"Error adding TPE1 tag: {e}")
+        
         tags = {
             TIT2: meta.title,
-            TPE1: meta.artist,
             TALB: meta.album,
             TPE2: meta.album_artist,
             TRCK: meta.track_number,

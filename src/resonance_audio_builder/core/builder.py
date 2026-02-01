@@ -13,6 +13,7 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.audio.audit import AudioAuditor
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.manager import DownloadManager
@@ -341,6 +342,63 @@ class App:
 
         Prompt.ask("\nPress ENTER to continue")
 
+    def _format_size(self, size_bytes: int) -> str:
+        for unit in ["B", "KB", "MB", "GB"]:
+            if size_bytes < 1024:
+                return f"{size_bytes:.2f} {unit}"
+            size_bytes /= 1024
+        return f"{size_bytes:.2f} TB"
+
+    def _run_audit(self):
+        """Ejecuta y muestra el reporte de auditoría"""
+        console.clear()
+        print_header()
+        
+        with console.status("[bold cyan]Scanning library...") as status:
+            auditor = AudioAuditor(self.log)
+            # Check spectral only if specifically requested or for small libraries?
+            # For now, let's ask or just do it if not too many files.
+            
+            hq_path = Path(self.cfg.OUTPUT_FOLDER_HQ)
+            mob_path = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
+            
+            check_spectral = Prompt.ask("Perform spectral analysis? (Slow)", choices=["y", "n"], default="n") == "y"
+            
+            results = auditor.scan_library(hq_path, mob_path, check_spectral=check_spectral)
+
+        if not results:
+            console.print("[yellow]No audio folders found to audit.[/yellow]")
+            console.input("\n[bold cyan]Press ENTER to return...[/bold cyan]")
+            return
+
+        for name, res in results.items():
+            table = Table(title=f"Library Audit: {name}", show_header=True, header_style="bold magenta", expand=True)
+            table.add_column("Metric", style="cyan")
+            table.add_column("Value", justify="right")
+            
+            table.add_row("Total Files", str(res.total_files))
+            table.add_row("Total Size", self._format_size(res.total_size_bytes))
+            
+            # Problems
+            table.add_section()
+            table.add_row("Missing Metadata", str(len(res.missing_metadata)), style="red" if res.missing_metadata else "")
+            table.add_row("Missing Covers", str(len(res.missing_covers)), style="yellow" if res.missing_covers else "")
+            table.add_row("Missing Lyrics", str(len(res.missing_lyrics)), style="dim" if res.missing_lyrics else "")
+            
+            if check_spectral:
+                table.add_row("Fake HQ Detected", str(len(res.fake_hq_detected)), style="bold red" if res.fake_hq_detected else "green")
+                
+            table.add_row("Errors", str(len(res.errors)), style="red" if res.errors else "")
+            
+            console.print(table)
+            
+            if res.fake_hq_detected:
+                with console.expander("Show Fake HQ Files"):
+                    for f in res.fake_hq_detected:
+                        console.print(f" [red]![/red] {f}")
+
+        console.input("\n[bold cyan]Press ENTER to return...[/bold cyan]")
+
     def _notify_end(self):
         """Sonido de notificacion"""
         try:
@@ -402,11 +460,12 @@ class App:
             menu_table.add_row("[bold cyan]1.[/bold cyan] Start download from CSV(s)", style="bold")
             menu_table.add_row("[bold cyan]2.[/bold cyan] Retry failed songs")
             menu_table.add_row("[bold cyan]3.[/bold cyan] Clear cache/progress")
-            menu_table.add_row("[bold red]4.[/bold red] Exit")
+            menu_table.add_row("[bold cyan]4.[/bold cyan] Library Audit & Statistics")
+            menu_table.add_row("[bold red]5.[/bold red] Exit")
 
             console.print(Panel(menu_table, title="Main Menu", border_style="blue"))
 
-            sel = Prompt.ask("Option", choices=["1", "2", "3", "4"])
+            sel = Prompt.ask("Option", choices=["1", "2", "3", "4", "5"])
 
             if sel == "1":
                 self._start_download()  # Interactivo
@@ -418,5 +477,7 @@ class App:
             elif sel == "3":
                 self._clear_cache()
             elif sel == "4":
+                self._run_audit()
+            elif sel == "5":
                 console.print("\n[magenta]Goodbye![/magenta]")
                 break
