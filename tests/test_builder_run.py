@@ -25,7 +25,7 @@ class TestAppFull:
         with (
             patch("sys.argv", ["main.py"]),
             patch.object(app, "_check_dependencies", return_value=True),
-            patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["4"]),
+            patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["4", "n", "5"]),
             patch("resonance_audio_builder.core.builder.console.print"),
             patch("resonance_audio_builder.core.builder.print_header"),
             patch("resonance_audio_builder.core.builder.App._show_status"),
