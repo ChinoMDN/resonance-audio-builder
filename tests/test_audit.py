@@ -1,6 +1,9 @@
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from resonance_audio_builder.audio.audit import AudioAuditor
+
 
 class TestAudioAuditor:
     @pytest.fixture

@@ -34,7 +34,8 @@ class ProgressDB:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS downloads (
                     track_id TEXT PRIMARY KEY,
                     artist TEXT,
@@ -45,7 +46,8 @@ class ProgressDB:
                     timestamp REAL,
                     retry_count INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)")
             conn.commit()
