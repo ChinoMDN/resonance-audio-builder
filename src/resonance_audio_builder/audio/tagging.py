@@ -22,7 +22,7 @@ class MetadataWriter:
                 audio.tags.add(TPE1(encoding=3, text=meta.artists))
             except Exception as e:
                 self.log.debug(f"Error adding TPE1 tag: {e}")
-        
+
         tags = {
             TIT2: meta.title,
             TALB: meta.album,

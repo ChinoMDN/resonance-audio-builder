@@ -24,23 +24,23 @@ class TrackMetadata:
     def artists(self) -> List[str]:
         """
         Parsea el campo artist y devuelve una lista de artistas individuales.
-        
+
         Spotify exporta colaboraciones separadas por comas:
         - "Wisin & Yandel" = UN artista (dúo)
         - "Wisin & Yandel, Romeo Santos" = DOS artistas (colaboración)
-        
+
         Por eso SOLO separamos por comas, respetando nombres con & o Y.
         """
         if not self.artist:
             return []
-        
+
         # Solo separar por comas - Spotify ya formatea las colaboraciones así
         # Los & y Y son parte de nombres de dúos (Wisin & Yandel, Angel Y Khriz)
-        artists = [part.strip() for part in self.artist.split(',')]
-        
+        artists = [part.strip() for part in self.artist.split(",")]
+
         # Filtrar vacíos
         artists = [a for a in artists if a]
-        
+
         return artists if artists else [self.artist]
 
     @classmethod

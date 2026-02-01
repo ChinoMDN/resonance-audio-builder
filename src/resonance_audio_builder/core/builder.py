@@ -12,8 +12,8 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.audio.audit import AudioAuditor
+from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.manager import DownloadManager
@@ -353,17 +353,17 @@ class App:
         """Ejecuta y muestra el reporte de auditoría"""
         console.clear()
         print_header()
-        
-        with console.status("[bold cyan]Scanning library...") as status:
+
+        with console.status("[bold cyan]Scanning library...") as _:
             auditor = AudioAuditor(self.log)
             # Check spectral only if specifically requested or for small libraries?
             # For now, let's ask or just do it if not too many files.
-            
+
             hq_path = Path(self.cfg.OUTPUT_FOLDER_HQ)
             mob_path = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
-            
+
             check_spectral = Prompt.ask("Perform spectral analysis? (Slow)", choices=["y", "n"], default="n") == "y"
-            
+
             results = auditor.scan_library(hq_path, mob_path, check_spectral=check_spectral)
 
         if not results:
@@ -375,23 +375,29 @@ class App:
             table = Table(title=f"Library Audit: {name}", show_header=True, header_style="bold magenta", expand=True)
             table.add_column("Metric", style="cyan")
             table.add_column("Value", justify="right")
-            
+
             table.add_row("Total Files", str(res.total_files))
             table.add_row("Total Size", self._format_size(res.total_size_bytes))
-            
+
             # Problems
             table.add_section()
-            table.add_row("Missing Metadata", str(len(res.missing_metadata)), style="red" if res.missing_metadata else "")
+            table.add_row(
+                "Missing Metadata", str(len(res.missing_metadata)), style="red" if res.missing_metadata else ""
+            )
             table.add_row("Missing Covers", str(len(res.missing_covers)), style="yellow" if res.missing_covers else "")
             table.add_row("Missing Lyrics", str(len(res.missing_lyrics)), style="dim" if res.missing_lyrics else "")
-            
+
             if check_spectral:
-                table.add_row("Fake HQ Detected", str(len(res.fake_hq_detected)), style="bold red" if res.fake_hq_detected else "green")
-                
+                table.add_row(
+                    "Fake HQ Detected",
+                    str(len(res.fake_hq_detected)),
+                    style="bold red" if res.fake_hq_detected else "green",
+                )
+
             table.add_row("Errors", str(len(res.errors)), style="red" if res.errors else "")
-            
+
             console.print(table)
-            
+
             if res.fake_hq_detected:
                 with console.expander("Show Fake HQ Files"):
                     for f in res.fake_hq_detected:
