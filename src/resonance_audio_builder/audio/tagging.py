@@ -16,13 +16,11 @@ class MetadataWriter:
     def write(self, path: Path, meta: TrackMetadata):
         """Escribe metadatos M4A (AAC)"""
         if not path.exists():
-            print(f"DEBUG: Path {path} does not exist")
             return
 
         # Enriquecer con datos externos (MusicBrainz)
         self._enrich_metadata(meta)
 
-        print(f"DEBUG: Processing {path}")
         # Mecanismo de reintento por si el archivo está bloqueado por Windows
         # o Antivirus
         max_retries = 3
@@ -61,30 +59,38 @@ class MetadataWriter:
             # Try passing simply path string
             audio = MP4(str(path))
 
-        # En M4A, si no existen tags, mutagen los crea automáticamente
-        # al asignar claves.
-        # Las claves de M4A son "Átomos" de 4 letras.
+        self._write_m4a_basic_tags(audio, meta)
+        self._write_m4a_numbers(audio, meta)
 
+        # --- 3. Letras (Lyrics) ---
+        try:
+            lyrics = fetch_lyrics(meta.artist, meta.title, meta.duration_seconds)
+            if lyrics:
+                audio["\xa9lyr"] = lyrics
+                self.log.debug(f"Lyrics embedded for: {meta.title}")
+        except Exception:
+            pass
+
+        # --- 4. Carátula (Cover Art) - CRÍTICO EN M4A ---
+        if meta.cover_data:
+            self._embed_cover_m4a(audio, meta.cover_data)
+
+        self._write_m4a_extended_tags(audio, meta)
+        audio.save()
+
+    def _write_m4a_basic_tags(self, audio, meta: TrackMetadata):
         # --- 1. Textos Básicos ---
         if meta.title:
             audio["\xa9nam"] = meta.title
-
         if meta.artists:
-            # M4A maneja listas de artistas perfectamente
             audio["\xa9ART"] = meta.artists
-
         if meta.album:
             audio["\xa9alb"] = meta.album
-
         if meta.album_artist:
-            # Nota: aART sin el símbolo de copyright
             audio["aART"] = meta.album_artist
-
         if meta.release_date and len(meta.release_date) >= 4:
             audio["\xa9day"] = meta.release_date[:4]  # Año
-
         if meta.genres:
-            # Tomamos el primer género principal
             main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[0]
             audio["\xa9gen"] = main_genre
 
@@ -97,8 +103,6 @@ class MetadataWriter:
         # Publisher / Label
         if meta.label:
             try:
-                # \xa9pub es el átomo estándar para Publisher
-                # en algunos contextos
                 audio["\xa9pub"] = meta.label
             except Exception:
                 pass
@@ -116,8 +120,8 @@ class MetadataWriter:
         if meta.tempo and meta.tempo > 0:
             audio["tmpo"] = [int(meta.tempo)]
 
+    def _write_m4a_numbers(self, audio, meta: TrackMetadata):
         # --- 2. Números (Tuplas) ---
-        # M4A exige formato (numero, total). Si no tienes total, usa 0.
         if meta.track_number:
             try:
                 tn = int(meta.track_number)
@@ -132,32 +136,17 @@ class MetadataWriter:
             except ValueError:
                 pass
 
-        # --- 3. Letras (Lyrics) ---
-        try:
-            lyrics = fetch_lyrics(meta.artist, meta.title, meta.duration_seconds)
-            if lyrics:
-                audio["\xa9lyr"] = lyrics
-                self.log.debug(f"Lyrics embedded for: {meta.title}")
-        except Exception:
-            pass
-
-        # --- 4. Carátula (Cover Art) - CRÍTICO EN M4A ---
-        if meta.cover_data:
-            self._embed_cover_m4a(audio, meta.cover_data)
-
+    def _write_m4a_extended_tags(self, audio, meta: TrackMetadata):
         # --- 5. Extended Metadata & Freeform Atoms ---
         if meta.composers:
-            # Writer / Composer atom
             audio["\xa9wrt"] = ", ".join(meta.composers)
 
         if meta.explicit:
-            # rtng: 0=None, 2=Clean, 4=Explicit
             audio["rtng"] = [4 if meta.explicit else 2]
 
         # Helper para freeform tags (----:com.apple.iTunes:NAME)
         def set_freeform(name: str, value):
             if value:
-                # Mutagen espera lista de bytes para freeform atoms
                 key = f"----:com.apple.iTunes:{name}"
                 val_bytes = str(value).encode("utf-8")
                 audio[key] = [val_bytes]
@@ -190,8 +179,6 @@ class MetadataWriter:
             set_freeform("PRODUCER", ", ".join(meta.producers))
         if meta.engineers:
             set_freeform("ENGINEER", ", ".join(meta.engineers))
-
-        audio.save()
 
     def _embed_cover_m4a(self, audio, data: bytes):
         """

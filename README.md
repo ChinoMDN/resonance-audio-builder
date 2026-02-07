@@ -55,21 +55,21 @@ Resonance focuses on **library quality and consistency**, providing:
 
 ## Features
 
-| Feature                    | Description                                                        |
-| -------------------------- | ------------------------------------------------------------------ |
-| **Rich UI**                | Professional terminal interface with live progress                 |
-| **Spectral Analysis**      | Detects fake HG audio (upscaled 128kbps)                           |
-| **Watchdog Mode**          | Auto-downloads when you drop CSVs into `Playlists/`                |
-| **Enterprise CI/CD**       | **NEW!** Automated linting, security scanning, and builds          |
-| **Testing Suite**          | **NEW!** 170+ Unit, Integration, and Security tests (76% coverage) |
-| **Security Hardened**      | **NEW!** Protection against Path Traversal & Command Injection     |
-| **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources)      |
-| **Multi-profile Encoding** | Configurable high and low bitrate audio profiles                   |
-| **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume                  |
-| **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                           |
-| **Smart Matching**         | ISRC-based matching with text-search fallback                      |
-| **Resume Support**         | Checkpoint-based recovery for interrupted sessions                 |
-| **Organized Output**       | Auto-sorts lists into subfolders                                   |
+| Feature                    | Description                                                          |
+| -------------------------- | -------------------------------------------------------------------- |
+| **Rich UI**                | Professional terminal interface with live progress                   |
+| **Spectral Analysis**      | Detects fake HG audio (upscaled 128kbps)                             |
+| **Watchdog Mode**          | Auto-downloads when you drop CSVs into `Playlists/`                  |
+| **Enterprise CI/CD**       | **NEW!** Automated linting, security scanning, and builds            |
+| **Testing Suite**          | **NEW!** 200+ Unit, Integration, and Security tests (75.7% coverage) |
+| **Security Hardened**      | **NEW!** Protection against Path Traversal & Command Injection       |
+| **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources)        |
+| **Multi-profile Encoding** | Configurable high and low bitrate audio profiles                     |
+| **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume                    |
+| **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                             |
+| **Smart Matching**         | ISRC-based matching with text-search fallback                        |
+| **Resume Support**         | Checkpoint-based recovery for interrupted sessions                   |
+| **Organized Output**       | Auto-sorts lists into subfolders                                     |
 
 ---
 
@@ -113,14 +113,14 @@ Choose between **High Quality (320kbps)**, **Mobile (96kbps)**, or **Both**. The
 
 ## Testing
 
-Version 8.2.2 features a comprehensive test suite (170+ tests). To run the tests, install the development dependencies and use `pytest`:
+Version 8.3.0 features a comprehensive test suite (200+ tests). To run the tests, install the development dependencies and use `pytest`:
 
 ```bash
 pip install -r requirements-dev.txt
 pytest tests/
 ```
 
-The suite covers Tier 1 (Unit), Tier 2 (Network), Tier 3 (Security), and Tier 4 (Integration), achieving over **76% statement coverage**.
+The suite covers Tier 1 (Unit), Tier 2 (Network), Tier 3 (Security), and Tier 4 (Integration), achieving over **75.7% statement coverage**.
 
 ## Configuration
 

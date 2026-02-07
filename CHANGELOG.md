@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format follows **[Keep a Changelog](https://keepachangelog.com/en/1.0.0/)**
 This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)**.
 
+## [8.3.0] – 2026-02-07
+
+### Changed
+
+- **Code Maintenance**: Comprehensive refactor of core modules to reduce cyclomatic complexity (C901) and improve maintainability:
+    - `MetadataWriter`: Logic split into focused helper methods for basic, numerical, and extended tags.
+    - `AudioDownloader`: Streamlined tagging logic.
+    - `DownloadManager`: Refactored unit-of-work methods (`_worker`, `_print_summary`) for better readability.
+    - `MusicBrainz`: Improved credit extraction logic.
+- **Metadata Handling**: Restored internal property naming and ID generation logic to maintain backward compatibility with the test suite.
+
+### Fixed
+
+- **CI/CD Pipeline**: Resolved persistent pipeline failures by addressing all linting violations and meeting strict code complexity requirements.
+- **Code Coverage**: Stabilized and verified test coverage at **75.71%**.
+- **Syntax Warnings**: Fixed invalid escape sequences in docstrings.
+
 ---
 
 ## [8.2.2] – 2026-01-26

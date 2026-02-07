@@ -128,47 +128,49 @@ class DownloadManager:
         while True:
             try:
                 # 0. Check Circuit Breaker
-                try:
-                    self.circuit_breaker.check()
-                except Exception as e:
-                    self.log.warning(str(e))
-                    await asyncio.sleep(10)
+                if not await self._check_circuit_breaker():
                     continue
 
                 track = await self.queue.get()
-                if self.keyboard.is_paused():
-                    await asyncio.sleep(0.5)
-
-                if self.keyboard.should_quit():
-                    self.queue.task_done()
-                    return
-
-                if self.keyboard.should_skip():
-                    self.state.mark(track, "skip")
-                    self.ui.update_main_progress(1)
-                    self.queue.task_done()
-                    continue
-
-                task_id = self.ui.add_download_task(track.artist, track.title)
-                try:
-                    success = await self._process_track_attempts(track, task_id)
-                    if not success:
-                        # Decide if this is a circuit-breaking failure?
-                        # _process_track_attempts swallows errors but returns False
-                        # We might need to inspect why it failed, but for now
-                        # we can leave record_failure to the fatal error handler
-                        pass
-                finally:
-                    if task_id:
-                        await asyncio.sleep(2.0)
-                        self.ui.remove_task(task_id)
-                    self.queue.task_done()
+                await self._process_queue_item(track)
 
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 self.log.error(f"Worker loop error: {e}")
                 await asyncio.sleep(1)
+
+    async def _check_circuit_breaker(self) -> bool:
+        try:
+            self.circuit_breaker.check()
+            return True
+        except Exception as e:
+            self.log.warning(str(e))
+            await asyncio.sleep(10)
+            return False
+
+    async def _process_queue_item(self, track):
+        if self.keyboard.is_paused():
+            await asyncio.sleep(0.5)
+
+        if self.keyboard.should_quit():
+            self.queue.task_done()
+            return
+
+        if self.keyboard.should_skip():
+            self.state.mark(track, "skip")
+            self.ui.update_main_progress(1)
+            self.queue.task_done()
+            return
+
+        task_id = self.ui.add_download_task(track.artist, track.title)
+        try:
+            await self._process_track_attempts(track, task_id)
+        finally:
+            if task_id:
+                await asyncio.sleep(2.0)
+                self.ui.remove_task(task_id)
+            self.queue.task_done()
 
     def _print_batch_summary(self, tracks: List[TrackMetadata], pending: List[TrackMetadata]):
         """Muestra el resumen visual de la cola de descarga"""
@@ -318,9 +320,6 @@ class DownloadManager:
 
     def _print_summary(self):
         """Imprime resumen final con Rich"""
-        # Calcular duración aproximada si start_time no es accesible
-        # (Idealmente RichUI podría trackear start_time o lo pasamos)
-
         stats = self.state.get_stats()
         console.print("\n")
         self.ui.show_summary(stats)
@@ -328,7 +327,11 @@ class DownloadManager:
         if self.failed_tracks:
             console.print(f"[yellow]Failed tracks saved to: {self.cfg.ERROR_FILE}[/yellow]")
 
-        # Guardar historial
+        self._save_session_history(stats)
+        self._generate_session_m3us(stats)
+        print("=" * 60)
+
+    def _save_session_history(self, stats):
         session_data = {
             "date": datetime.now().isoformat(),
             "success": stats.get("ok", 0),
@@ -340,7 +343,7 @@ class DownloadManager:
         if self.cfg.SAVE_HISTORY:
             save_history(self.cfg.HISTORY_FILE, session_data)
 
-        # Exportar playlists M3U individuales
+    def _generate_session_m3us(self, stats):
         if self.cfg.GENERATE_M3U and stats.get("ok", 0) > 0:
             try:
                 from resonance_audio_builder.core.utils import export_playlist_m3us
@@ -375,5 +378,3 @@ class DownloadManager:
             except Exception as e:
                 self.log.debug(f"M3U generation error: {e}")
                 pass
-
-        print("=" * 60)

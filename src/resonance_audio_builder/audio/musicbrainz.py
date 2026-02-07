@@ -44,33 +44,15 @@ def fetch_credits(isrc: str) -> dict:
         return {}
 
     try:
-        # MusicBrainz requires a custom User-Agent
         headers = {
             "User-Agent": ("ResonanceAudioBuilder/1.0 (https://github.com/resonance)"),
             "Accept": "application/json",
         }
 
-        # Search by ISRC
-        url = "https://musicbrainz.org/ws/2/recording" f"?query=isrc:{isrc}&fmt=json"
-        resp = _rate_limited_get(url, headers=headers, timeout=5)
-
-        if resp.status_code != 200:
-            return {}
-
-        data = resp.json()
-        recordings = data.get("recordings", [])
-
-        if not recordings:
-            return {}
-
-        # Get the first (best) match
-        recording = recordings[0]
-        recording_id = recording.get("id")
-
+        recording_id = _get_recording_id(isrc, headers)
         if not recording_id:
             return {}
 
-        # Fetch detailed recording info with artist-rels
         detail_url = f"https://musicbrainz.org/ws/2/recording/{recording_id}" "?inc=artist-rels+work-rels&fmt=json"
         detail_resp = _rate_limited_get(detail_url, headers=headers, timeout=5)
 
@@ -78,46 +60,65 @@ def fetch_credits(isrc: str) -> dict:
             return {}
 
         detail = detail_resp.json()
-
-        composers = []
-        producers = []
-        engineers = []
-
-        # Extract from artist relations
-        for rel in detail.get("relations", []):
-            rel_type = rel.get("type", "").lower()
-            artist = rel.get("artist", {})
-            name = artist.get("name", "")
-
-            if not name:
-                continue
-
-            if rel_type in ("composer", "writer", "lyricist"):
-                composers.append(name)
-            elif rel_type == "producer":
-                producers.append(name)
-            elif rel_type in ("engineer", "mix", "mastering"):
-                engineers.append(name)
-
-        # Also check work relations for composers
-        for work_rel in detail.get("relations", []):
-            if work_rel.get("type") == "performance":
-                work = work_rel.get("work", {})
-                work_id = work.get("id")
-                if work_id:
-                    # Fetch work details for composer info
-                    work_composers = _fetch_work_composers(work_id, headers)
-                    composers.extend(work_composers)
-
-        # Deduplicate while preserving order
-        return {
-            "composers": list(dict.fromkeys(composers)),
-            "producers": list(dict.fromkeys(producers)),
-            "engineers": list(dict.fromkeys(engineers)),
-        }
+        return _extract_credits_from_details(detail, headers)
 
     except Exception:
         return {}
+
+
+def _get_recording_id(isrc: str, headers: dict) -> Optional[str]:
+    """Search by ISRC and return the first recording ID"""
+    url = f"https://musicbrainz.org/ws/2/recording?query=isrc:{isrc}&fmt=json"
+    resp = _rate_limited_get(url, headers=headers, timeout=5)
+
+    if resp.status_code != 200:
+        return None
+
+    data = resp.json()
+    recordings = data.get("recordings", [])
+
+    if not recordings:
+        return None
+
+    return recordings[0].get("id")
+
+
+def _extract_credits_from_details(detail: dict, headers: dict) -> dict:
+    """Extract credits from recording detail JSON"""
+    composers = []
+    producers = []
+    engineers = []
+
+    # Extract from artist relations
+    for rel in detail.get("relations", []):
+        rel_type = rel.get("type", "").lower()
+        artist = rel.get("artist", {})
+        name = artist.get("name", "")
+
+        if not name:
+            continue
+
+        if rel_type in ("composer", "writer", "lyricist"):
+            composers.append(name)
+        elif rel_type == "producer":
+            producers.append(name)
+        elif rel_type in ("engineer", "mix", "mastering"):
+            engineers.append(name)
+
+    # Also check work relations for composers
+    for work_rel in detail.get("relations", []):
+        if work_rel.get("type") == "performance":
+            work = work_rel.get("work", {})
+            work_id = work.get("id")
+            if work_id:
+                work_composers = _fetch_work_composers(work_id, headers)
+                composers.extend(work_composers)
+
+    return {
+        "composers": list(dict.fromkeys(composers)),
+        "producers": list(dict.fromkeys(producers)),
+        "engineers": list(dict.fromkeys(engineers)),
+    }
 
 
 def _fetch_work_composers(work_id: str, headers: dict) -> list:

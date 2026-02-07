@@ -1,9 +1,11 @@
+from unittest.mock import MagicMock, mock_open, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, mock_open
-from resonance_audio_builder.core.manager import DownloadManager
-from resonance_audio_builder.core.config import Config
+
 from resonance_audio_builder.audio.metadata import TrackMetadata
-import csv
+from resonance_audio_builder.core.config import Config
+from resonance_audio_builder.core.manager import DownloadManager
+
 
 @pytest.fixture
 def manager():
@@ -19,12 +21,13 @@ def manager():
         patch("resonance_audio_builder.core.manager.YouTubeSearcher"),
         patch("resonance_audio_builder.core.manager.MetadataWriter"),
         patch("resonance_audio_builder.core.manager.KeyboardController"),
-        patch("resonance_audio_builder.network.limiter.CircuitBreaker")
+        patch("resonance_audio_builder.network.limiter.CircuitBreaker"),
     ):
         mgr = DownloadManager(cfg, cache)
         mgr.ui = MagicMock()
         mgr.state = MagicMock()
         return mgr
+
 
 def test_save_failed_writes_files(manager):
     track = TrackMetadata(track_id="1", title="Title", artist="Artist")
@@ -40,11 +43,13 @@ def test_save_failed_writes_files(manager):
         mock_file.assert_any_call("error.txt", "w", encoding="utf-8")
         mock_file.assert_any_call("error.csv", "w", encoding="utf-8", newline="")
 
+
 def test_save_failed_no_tracks(manager):
     manager.failed_tracks = []
     with patch("builtins.open", mock_open()) as mock_file:
         manager._save_failed()
         mock_file.assert_not_called()
+
 
 def test_save_failed_exception_handling(manager):
     track = TrackMetadata(track_id="1", title="Title", artist="Artist")

@@ -288,6 +288,10 @@ class AudioDownloader:
 
     def _apply_m4a_tags(self, audio: MP4, track: TrackMetadata):
         """Apply all metadata tags to M4A file using iTunes atoms"""
+        self._apply_m4a_basic_tags(audio, track)
+        self._apply_m4a_extra_tags(audio, track)
+
+    def _apply_m4a_basic_tags(self, audio: MP4, track: TrackMetadata):
         # Basic tags
         if track.title:
             audio["\xa9nam"] = [track.title]
@@ -322,6 +326,7 @@ class AudioDownloader:
         if track.tempo > 0:
             audio["tmpo"] = [int(round(track.tempo))]
 
+    def _apply_m4a_extra_tags(self, audio: MP4, track: TrackMetadata):
         # Track number (tuple format: track, total)
         if track.track_number:
             try:

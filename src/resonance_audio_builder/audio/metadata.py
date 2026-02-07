@@ -21,9 +21,9 @@ class TrackMetadata:
     cover_data: Optional[bytes] = None
     raw_data: dict = field(default_factory=dict)
 
-    # New extended metadata fields
-    genres: str = ""  # Artist genres (comma-separated)
-    album_genres: str = ""  # Album genres
+    # Metadatos extendidos
+    genres: str = ""
+    album_genres: str = ""
     popularity: int = 0
     explicit: bool = False
     label: str = ""
@@ -54,9 +54,6 @@ class TrackMetadata:
     @property
     def artists(self) -> List[str]:
         r"""
-        Parsea el campo artist y devuelve una lista de artistas individuales.
-        Maneja comas escapadas (ej: "Daniel\, Me Estás Matando") correctamente.
-
         Spotify exporta colaboraciones separadas por comas:
         - "Wisin & Yandel" = UN artista (dúo)
         - "Wisin & Yandel, Romeo Santos" = DOS artistas (colaboración)
@@ -87,84 +84,75 @@ class TrackMetadata:
 
     @classmethod
     def from_csv_row(cls, row: dict) -> "TrackMetadata":
+        # Normalizar claves a minúsculas y quitar espacios
         r_norm = {k.strip().lower(): v for k, v in row.items()}
-        r_original = {k.strip(): v for k, v in row.items()}
+        r_orig = {k.strip(): v for k, v in row.items()}
 
-        def get_val(*keys):
+        def get_v(*keys):
             for k in keys:
                 val = r_norm.get(k.lower())
                 if val is not None:
                     return val.strip()
             return ""
 
-        def get_float(*keys):
-            val = get_val(*keys)
+        def get_f(*keys):
             try:
+                val = get_v(*keys)
                 return float(val) if val else 0.0
             except ValueError:
                 return 0.0
 
-        def get_int(*keys):
-            val = get_val(*keys)
+        def get_i(*keys):
             try:
+                val = get_v(*keys)
                 return int(float(val)) if val else 0
             except ValueError:
                 return 0
 
-        isrc = get_val("isrc", "code")
-        artist = get_val("artist name(s)", "artist", "artist name")
-        title = get_val("track name", "track", "title", "name")
+        isrc = get_v("isrc", "code")
+        artist = get_v("artist name(s)", "artist", "artist name")
+        title = get_v("track name", "track", "title", "name")
 
         if isrc:
-            track_id = f"isrc_{isrc}"
+            tid = f"isrc_{isrc}"
         else:
-            # Fallback robusto: MD5 de Artist + Title
-            track_id = hashlib.md5(f"{artist}_{title}".encode(), usedforsecurity=False).hexdigest()[:16]
-
-        duration_str = get_val("track duration (ms)", "duration_ms", "duration")
-        duration = int(duration_str) if duration_str and duration_str.isdigit() else 0
-
-        # Parse explicit field
-        explicit_str = get_val("explicit").lower()
-        explicit = explicit_str in ("true", "1", "yes")
+            tid = hashlib.md5(f"{artist}_{title}".encode(), usedforsecurity=False).hexdigest()[:16]
 
         return cls(
-            track_id=track_id,
-            title=title,
+            track_id=tid,
             artist=artist,
-            album=get_val("album name", "album"),
-            album_artist=get_val("album artist name(s)", "album artist"),
-            release_date=get_val("album release date", "release date", "year"),
-            track_number=get_val("track number", "track no"),
-            disc_number=get_val("disc number", "disc no"),
+            title=title,
             isrc=isrc,
-            spotify_uri=get_val("track uri", "uri", "spotify uri"),
-            cover_url=get_val("album image url", "image url", "cover"),
-            duration_ms=duration,
-            raw_data=r_original,
-            # Extended metadata
-            genres=get_val("artist genres", "genres", "genre"),
-            album_genres=get_val("album genres"),
-            popularity=get_int("popularity"),
-            explicit=explicit,
-            label=get_val("label"),
-            copyrights=get_val("copyrights"),
-            preview_url=get_val("track preview url", "preview url"),
-            added_by=get_val("added by"),
-            added_at=get_val("added at"),
-            # Audio features
-            tempo=get_float("tempo", "bpm"),
-            energy=get_float("energy"),
-            danceability=get_float("danceability"),
-            valence=get_float("valence"),
-            acousticness=get_float("acousticness"),
-            instrumentalness=get_float("instrumentalness"),
-            speechiness=get_float("speechiness"),
-            liveness=get_float("liveness"),
-            loudness=get_float("loudness"),
-            key=get_int("key"),
-            mode=get_int("mode"),
-            time_signature=get_int("time signature", "time_signature") or 4,
+            album=get_v("album name", "album"),
+            album_artist=get_v("album artist name(s)", "album artist"),
+            release_date=get_v("album release date", "release date", "date", "year"),
+            track_number=get_v("track number", "track no"),
+            disc_number=get_v("disc number", "disc no"),
+            duration_ms=get_i("track duration (ms)", "duration ms", "duration", "ms"),
+            spotify_uri=get_v("track uri", "spotify uri", "uri"),
+            cover_url=get_v("album image url", "image url", "cover"),
+            raw_data=r_orig,
+            popularity=get_i("popularity"),
+            explicit=get_v("explicit").lower() in ("true", "1", "yes"),
+            genres=get_v("artist genres", "genres", "genre"),
+            album_genres=get_v("album genres"),
+            label=get_v("label", "publisher"),
+            copyrights=get_v("copyrights", "copyright"),
+            preview_url=get_v("track preview url", "preview url"),
+            added_by=get_v("added by"),
+            added_at=get_v("added at"),
+            tempo=get_f("tempo", "bpm"),
+            energy=get_f("energy"),
+            danceability=get_f("danceability"),
+            valence=get_f("valence"),
+            acousticness=get_f("acousticness"),
+            instrumentalness=get_f("instrumentalness"),
+            liveness=get_f("liveness"),
+            speechiness=get_f("speechiness"),
+            loudness=get_f("loudness"),
+            key=get_i("key"),
+            mode=get_i("mode"),
+            time_signature=get_i("time signature", "time_signature") or 4,
         )
 
     @property
