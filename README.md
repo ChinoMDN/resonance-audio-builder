@@ -135,7 +135,7 @@ Edit `config.json` to customize behavior:
     "max_workers": 3,
     "normalize_audio": true,
     "embed_lyrics": true,
-    "output_format": "mp3"
+    "output_format": "m4a"
 }
 ```
 
