@@ -29,12 +29,12 @@ class TestAudioAnalyzer:
 
     def test_analyze_missing_file(self, analyzer, tmp_path):
         """Missing file should return False"""
-        missing = tmp_path / "missing.mp3"
+        missing = tmp_path / "missing.m4a"
         assert analyzer.analyze_integrity(missing, 20000) is False
 
     def test_analyze_corrupted_file(self, analyzer, tmp_path):
         """Corrupted file should return True (fail open) as per implementation"""
-        corrupted = tmp_path / "corrupt.mp3"
+        corrupted = tmp_path / "corrupt.m4a"
         corrupted.write_bytes(b"Garbage data")
 
         # Real code catches Exception and returns True (Innocent until proven guilty)

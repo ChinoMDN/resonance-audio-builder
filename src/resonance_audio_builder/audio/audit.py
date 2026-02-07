@@ -2,8 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
 
-from mutagen.id3 import ID3
-from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4
 
 from resonance_audio_builder.audio.analysis import AudioAnalyzer
 from resonance_audio_builder.core.logger import Logger
@@ -42,7 +41,7 @@ class AudioAuditor:
 
     def _audit_folder(self, folder_path: Path, check_spectral: bool = False) -> AuditResult:
         result = AuditResult()
-        files = list(folder_path.rglob("*.mp3"))
+        files = list(folder_path.rglob("*.m4a"))
         result.total_files = len(files)
 
         for file_path in files:
@@ -51,7 +50,7 @@ class AudioAuditor:
         return result
 
     def _audit_single_file(self, file_path: Path, result: AuditResult, check_spectral: bool) -> None:
-        """Audit a single MP3 file and update result."""
+        """Audit a single M4A file and update result."""
         try:
             result.total_size_bytes += file_path.stat().st_size
             self._check_file_tags(file_path, result)
@@ -64,17 +63,20 @@ class AudioAuditor:
             result.errors.append(str(file_path))
 
     def _check_file_tags(self, file_path: Path, result: AuditResult) -> None:
-        """Check ID3 tags for metadata, cover, and lyrics."""
+        """Check M4A tags for metadata, cover, and lyrics."""
         try:
-            audio = MP3(file_path, ID3=ID3)
+            audio = MP4(file_path)
 
-            if "TIT2" not in audio or "TPE1" not in audio:
+            # Check title and artist (iTunes atoms)
+            if "\xa9nam" not in audio or "\xa9ART" not in audio:
                 result.missing_metadata.append(file_path.name)
 
-            if not any(frame.startswith("APIC") for frame in audio.keys()):
+            # Check cover art
+            if "covr" not in audio:
                 result.missing_covers.append(file_path.name)
 
-            if not any(frame.startswith("USLT") for frame in audio.keys()):
+            # Check lyrics
+            if "\xa9lyr" not in audio:
                 result.missing_lyrics.append(file_path.name)
 
         except Exception as e:

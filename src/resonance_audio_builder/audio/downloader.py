@@ -11,12 +11,13 @@ from typing import NoReturn, Optional, Tuple
 
 import aiohttp
 import yt_dlp
-from mutagen.id3 import APIC, COMM, ID3, TALB, TIT2, TPE1, TPE2, TPOS, TRCK, TSRC, TYER
-from mutagen.mp3 import MP3
+from mutagen.mp4 import MP4, MP4Cover
 from PIL import Image
 
 from resonance_audio_builder.audio.analysis import AudioAnalyzer
+from resonance_audio_builder.audio.lyrics import fetch_lyrics
 from resonance_audio_builder.audio.metadata import TrackMetadata
+from resonance_audio_builder.audio.musicbrainz import get_composer_string
 from resonance_audio_builder.audio.youtube import SearchResult
 from resonance_audio_builder.core.config import Config, QualityMode
 from resonance_audio_builder.core.exceptions import (
@@ -135,7 +136,7 @@ class AudioDownloader:
         if needed_mobile:
             mobile_folder.mkdir(parents=True, exist_ok=True)
 
-        filename = f"{track.safe_filename}.mp3"
+        filename = f"{track.safe_filename}.m4a"
         return hq_folder / filename, mobile_folder / filename, needed_hq, needed_mobile
 
     async def _check_existing_files(
@@ -276,57 +277,105 @@ class AudioDownloader:
         await loop.run_in_executor(None, self._inject_metadata_sync, path, track)
 
     def _inject_metadata_sync(self, file_path: Path, track: TrackMetadata):
-        """Synchronous part of metadata injection"""
+        """Synchronous part of metadata injection for M4A (AAC)"""
         try:
-            audio = self._recreate_mp3_tags(file_path)
-            self._apply_basic_tags(audio, track)
-            self._apply_extended_tags(audio, track)
-            audio.save(v2_version=3)
+            audio = MP4(str(file_path))
+            self._apply_m4a_tags(audio, track)
+            audio.save()
             self.log.debug(f"Metadatos inyectados: {track.title}")
         except Exception as e:
             self.log.debug(f"Metadata error: {e}")
 
-    def _recreate_mp3_tags(self, file_path: Path) -> MP3:
-        try:
-            audio = MP3(str(file_path), ID3=ID3)
-        except Exception:
-            audio = MP3(str(file_path))
-        try:
-            audio.delete()
-        except Exception:
-            pass
-        audio = MP3(str(file_path))
-        audio.add_tags()
-        return audio
-
-    def _apply_basic_tags(self, audio: MP3, track: TrackMetadata):
+    def _apply_m4a_tags(self, audio: MP4, track: TrackMetadata):
+        """Apply all metadata tags to M4A file using iTunes atoms"""
+        # Basic tags
         if track.title:
-            audio.tags.add(TIT2(encoding=3, text=track.title))
-        # TPE1 soporta múltiples artistas como lista, haciéndolos seleccionables individualmente
-        if track.artists:
-            audio.tags.add(TPE1(encoding=3, text=track.artists))
-        if track.album:
-            audio.tags.add(TALB(encoding=3, text=track.album))
+            audio["\xa9nam"] = [track.title]
 
-    def _apply_extended_tags(self, audio: MP3, track: TrackMetadata):
-        mapping = {
-            TPE2: track.album_artist,
-            TRCK: track.track_number,
-            TPOS: track.disc_number,
-            TSRC: track.isrc,
-        }
-        for tag_class, val in mapping.items():
-            if val:
-                audio.tags.add(tag_class(encoding=3, text=str(val)))
+        # Artists - M4A handles lists correctly
+        if track.artists:
+            audio["\xa9ART"] = track.artists
+
+        if track.album:
+            audio["\xa9alb"] = [track.album]
+
+        if track.album_artist:
+            audio["aART"] = [track.album_artist]
 
         if track.release_date and len(track.release_date) >= 4:
-            audio.tags.add(TYER(encoding=3, text=track.release_date[:4]))
+            audio["\xa9day"] = [track.release_date[:4]]
 
+        # Genre - take first from list
+        if track.genres:
+            first_genre = track.genre_list[0] if track.genre_list else track.genres.split(",")[0]
+            audio["\xa9gen"] = [first_genre.strip().title()]
+
+        # Label/Copyright
+        if track.label:
+            audio["cprt"] = [track.label]
+
+        # Comment with Spotify URI
         if track.spotify_uri:
-            audio.tags.add(COMM(encoding=3, lang="eng", desc="", text=f"Spotify: {track.spotify_uri}"))
+            audio["\xa9cmt"] = [f"Spotify: {track.spotify_uri}"]
 
+        # BPM/Tempo
+        if track.tempo > 0:
+            audio["tmpo"] = [int(round(track.tempo))]
+
+        # Track number (tuple format: track, total)
+        if track.track_number:
+            try:
+                tn = int(track.track_number)
+                audio["trkn"] = [(tn, 0)]
+            except ValueError:
+                pass
+
+        # Disc number
+        if track.disc_number:
+            try:
+                dn = int(track.disc_number)
+                audio["disk"] = [(dn, 0)]
+            except ValueError:
+                pass
+
+        # Cover art - M4A requires format specification
         if track.cover_data:
-            audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=track.cover_data))
+            self._embed_cover_m4a(audio, track.cover_data)
+
+        # Lyrics
+        try:
+            lyrics = fetch_lyrics(track.artist, track.title, track.duration_seconds)
+            if lyrics:
+                audio["\xa9lyr"] = [lyrics]
+                self.log.debug(f"Letras embebidas: {track.title}")
+        except Exception as e:
+            self.log.debug(f"Error obteniendo letras: {e}")
+
+        # Composer from MusicBrainz
+        try:
+            if track.isrc:
+                composer = get_composer_string(track.isrc)
+                if composer:
+                    audio["\xa9wrt"] = [composer]
+                    self.log.debug(f"Compositor: {composer}")
+        except Exception as e:
+            self.log.debug(f"Error obteniendo compositor: {e}")
+
+    def _embed_cover_m4a(self, audio: MP4, data: bytes):
+        """Embed cover art in M4A, detecting JPEG vs PNG format"""
+        try:
+            # Detect format by magic bytes
+            if data.startswith(b"\xff\xd8\xff"):
+                fmt = MP4Cover.FORMAT_JPEG
+            elif data.startswith(b"\x89PNG"):
+                fmt = MP4Cover.FORMAT_PNG
+            else:
+                # Unknown format, skip to avoid corruption
+                return
+
+            audio["covr"] = [MP4Cover(data, imageformat=fmt)]
+        except Exception as e:
+            self.log.debug(f"Error embedding cover: {e}")
 
     def _get_ytdlp_options(self, out_tmpl: Path, proxy: Optional[str]) -> dict:
         """Configura el diccionario de opciones para yt-dlp"""
@@ -445,7 +494,7 @@ class AudioDownloader:
             raise YouTubeError(f"Error descarga: {str(e)}")
 
     def _build_ffmpeg_cmd(self, input_path: Path, output_path: Path, bitrate: str) -> list:
-        """Construye el comando ffmpeg modularmente"""
+        """Construye el comando ffmpeg para AAC (M4A)"""
         cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(input_path), "-vn"]
         if self.cfg.NORMALIZE_AUDIO:
             cmd.extend(["-filter:a", "loudnorm=I=-14:TP=-1.5:LRA=11"])
@@ -453,13 +502,15 @@ class AudioDownloader:
         cmd.extend(
             [
                 "-acodec",
-                "libmp3lame",
+                "aac",
                 "-b:a",
                 f"{bitrate}k",
                 "-ar",
                 "44100",
                 "-ac",
                 "2",
+                "-movflags",
+                "+faststart",
                 "-map_metadata",
                 "-1",
                 str(output_path),

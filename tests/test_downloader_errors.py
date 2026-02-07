@@ -38,7 +38,7 @@ class TestDownloaderFailures:
         # Crear archivo dummy de entrada
         input_f = tmp_path / "temp.webm"
         input_f.touch()
-        output_f = tmp_path / "out.mp3"
+        output_f = tmp_path / "out.m4a"
 
         # Simulamos fallo en subprocess (returncode != 0)
         mock_proc = MagicMock()

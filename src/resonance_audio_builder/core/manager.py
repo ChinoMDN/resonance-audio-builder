@@ -1,6 +1,5 @@
 import asyncio
 import csv
-import os
 import traceback
 from datetime import datetime
 from typing import List, Tuple
@@ -19,7 +18,7 @@ from resonance_audio_builder.core.input import KeyboardController
 from resonance_audio_builder.core.logger import Logger
 from resonance_audio_builder.core.state import ProgressDB
 from resonance_audio_builder.core.ui import RichUI, console, print_header
-from resonance_audio_builder.core.utils import export_m3u, save_history
+from resonance_audio_builder.core.utils import save_history
 from resonance_audio_builder.network.cache import CacheManager
 from resonance_audio_builder.network.proxies import SmartProxyManager
 
@@ -47,9 +46,13 @@ class DownloadManager:
         console.clear()
         self.queue: asyncio.Queue[TrackMetadata] = asyncio.Queue()
         self.failed_tracks: List[Tuple[TrackMetadata, str]] = []
+        self.all_tracks: List[TrackMetadata] = []  # Store all tracks for M3U generation
 
     async def run(self, tracks: List[TrackMetadata]):
         """Ejecuta la descarga de todas las canciones (Async)"""
+        # Store all tracks for M3U generation
+        self.all_tracks = tracks
+
         # Filtrar ya procesadas
         pending = [t for t in tracks if not self.state.is_done(t.track_id)]
 
@@ -269,10 +272,17 @@ class DownloadManager:
 
             with open(self.cfg.ERROR_CSV, "w", encoding="utf-8", newline="") as f:
                 if self.failed_tracks:
-                    writer = csv.DictWriter(f, fieldnames=list(self.failed_tracks[0][0].raw_data.keys()))
+                    # Get all fieldnames from raw_data plus playlist_subfolder
+                    base_fields = list(self.failed_tracks[0][0].raw_data.keys())
+                    all_fields = base_fields + ["playlist_subfolder"]
+
+                    writer = csv.DictWriter(f, fieldnames=all_fields)
                     writer.writeheader()
                     for track, _ in self.failed_tracks:
-                        writer.writerow(track.raw_data)
+                        row_data = track.raw_data.copy()
+                        # Add playlist_subfolder if it exists
+                        row_data["playlist_subfolder"] = getattr(track, "playlist_subfolder", "")
+                        writer.writerow(row_data)
         except Exception:
             pass
 
@@ -300,27 +310,40 @@ class DownloadManager:
         if self.cfg.SAVE_HISTORY:
             save_history(self.cfg.HISTORY_FILE, session_data)
 
-        # Exportar playlist M3U
+        # Exportar playlists M3U individuales
         if self.cfg.GENERATE_M3U and stats.get("ok", 0) > 0:
             try:
-                # Recopilar archivos descargados
-                m3u_tracks = []
+                from resonance_audio_builder.core.utils import export_playlist_m3us
+
+                # Build a mapping of playlist_name -> [tracks]
+                playlist_tracks_map = {}
+                for track in self.all_tracks:
+                    playlists = getattr(track, "playlists", [])
+                    if not playlists:
+                        # Fallback to subfolder if playlists not set
+                        subfolder = getattr(track, "playlist_subfolder", None)
+                        if subfolder:
+                            playlists = [subfolder]
+
+                    for playlist_name in playlists:
+                        if playlist_name not in playlist_tracks_map:
+                            playlist_tracks_map[playlist_name] = []
+                        playlist_tracks_map[playlist_name].append(track)
+
+                # Determine output folder
                 folder = (
                     self.cfg.OUTPUT_FOLDER_HQ
                     if self.cfg.MODE != QualityMode.MOBILE_ONLY
                     else self.cfg.OUTPUT_FOLDER_MOBILE
                 )
-                if os.path.exists(folder):
-                    for f in os.listdir(folder):
-                        if f.endswith(".mp3"):
-                            path = os.path.join(folder, f)
-                            title = f.replace(".mp3", "")
-                            m3u_tracks.append((path, title, 0))
 
-                if m3u_tracks:
-                    export_m3u(m3u_tracks, self.cfg.M3U_FILE)
-                    print(f"  [i] Playlist M3U: {self.cfg.M3U_FILE}")
-            except Exception:
+                # Generate individual M3U files (saved inside each playlist folder)
+                export_playlist_m3us(playlist_tracks_map, folder)
+
+                if playlist_tracks_map:
+                    print(f"  [i] {len(playlist_tracks_map)} playlist M3U files created")
+            except Exception as e:
+                self.log.debug(f"M3U generation error: {e}")
                 pass
 
         print("=" * 60)

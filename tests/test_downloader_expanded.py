@@ -55,7 +55,7 @@ class TestAudioDownloaderExpanded:
 
         with patch.object(downloader, "_prepare_download_paths") as mock_prep:
             # Needed HQ and Mobile, not existing
-            mock_prep.return_value = (Path("hq.mp3"), Path("mob.mp3"), True, True)
+            mock_prep.return_value = (Path("hq.m4a"), Path("mob.m4a"), True, True)
 
             with (
                 patch.object(downloader, "_check_existing_files", return_value=(False, False)),
@@ -93,8 +93,8 @@ class TestAudioDownloaderExpanded:
         downloader.cfg.QUALITY_MOBILE_BITRATE = "96"
 
         raw = Path("raw.webm")
-        hq = Path("hq.mp3")
-        mob = Path("mob.mp3")
+        hq = Path("hq.m4a")
+        mob = Path("mob.m4a")
         track = MagicMock()
 
         # Mock transcode: HQ succeeds, Mobile fails
@@ -138,13 +138,13 @@ class TestAudioDownloaderExpanded:
             with patch.object(Path, "exists", return_value=True), patch.object(Path, "stat") as mock_stat:
                 mock_stat.return_value.st_size = 100000
 
-                valid = await downloader.validate_audio_file(Path("test.mp3"))
+                valid = await downloader.validate_audio_file(Path("test.m4a"))
                 assert valid is True
 
     @pytest.mark.asyncio
     async def test_download_skip_all_done(self, downloader):
         with patch.object(downloader, "_prepare_download_paths") as mock_prep:
-            mock_prep.return_value = (Path("hq.mp3"), Path("mob.mp3"), True, True)
+            mock_prep.return_value = (Path("hq.m4a"), Path("mob.m4a"), True, True)
 
             with patch.object(downloader, "_check_existing_files", return_value=(True, True)):
                 track = MagicMock()
@@ -155,7 +155,7 @@ class TestAudioDownloaderExpanded:
 
     def test_build_ffmpeg_cmd(self, downloader):
         downloader.cfg.NORMALIZE_AUDIO = True
-        cmd = downloader._build_ffmpeg_cmd(Path("in.webm"), Path("out.mp3"), "320")
+        cmd = downloader._build_ffmpeg_cmd(Path("in.webm"), Path("out.m4a"), "320")
         assert any("loudnorm" in arg for arg in cmd)
         assert "320k" in cmd
-        assert str(Path("out.mp3")) in cmd
+        assert str(Path("out.m4a")) in cmd

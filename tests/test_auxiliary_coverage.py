@@ -64,7 +64,7 @@ class TestCoverageBooster:
         from resonance_audio_builder.audio.tagging import MetadataWriter
 
         # Create REAL tiny MP3 file instead of mock
-        audio_file = tmp_path / "test.mp3"
+        audio_file = tmp_path / "test.m4a"
 
         # Create a minimal valid MP3 header
         # MP3 frame sync: 0xFF 0xFB (MPEG-1 Layer 3)
@@ -85,13 +85,12 @@ class TestCoverageBooster:
         # Mock Logger
         mock_log = Mock()
 
-        # Mock MP3 to avoid real file parsing issues
-        with patch("resonance_audio_builder.audio.tagging.MP3") as mock_mp3_cls:
+        # Mock MP4 to avoid real file parsing issues
+        with patch("resonance_audio_builder.audio.tagging.MP4") as mock_mp4_cls:
             mock_audio = MagicMock()
-            mock_mp3_cls.return_value = mock_audio
-            # mocked audio tags shouldn't be None for add_tags skip?
-            # code: if audio.tags is None: audio.add_tags()
-            mock_audio.tags = MagicMock()
+            mock_mp4_cls.return_value = mock_audio
+            # M4A dict-like access
+            mock_audio.__setitem__ = MagicMock()
 
             writer = MetadataWriter(mock_log)
             writer.write(audio_file, track)

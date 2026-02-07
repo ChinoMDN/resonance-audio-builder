@@ -51,7 +51,7 @@ class TestAudioDownloader:
     async def test_download_skip_existing(self, downloader, tmp_path):
         """Should skip if file exists and validates"""
         downloader.cfg.MODE = QualityMode.HQ_ONLY
-        hq_file = Path(downloader.cfg.OUTPUT_FOLDER_HQ) / "Artist - Title.mp3"
+        hq_file = Path(downloader.cfg.OUTPUT_FOLDER_HQ) / "Artist - Title.m4a"
         hq_file.parent.mkdir(parents=True, exist_ok=True)
         hq_file.touch()
 
@@ -69,7 +69,7 @@ class TestAudioDownloader:
     async def test_transcode_calls_ffmpeg(self, downloader):
         """Transcode should invoke ffmpeg subprocess"""
         input_p = Path("in.webm")
-        output_p = Path("out.mp3")
+        output_p = Path("out.m4a")
 
         with patch("asyncio.create_subprocess_exec") as mock_exec:
             process = AsyncMock()

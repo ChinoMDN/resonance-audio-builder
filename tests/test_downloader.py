@@ -19,7 +19,7 @@ class TestAudioDownloader:
 
     @pytest.mark.asyncio
     async def test_validate_audio_file_success(self, downloader, tmp_path):
-        f = tmp_path / "valid.mp3"
+        f = tmp_path / "valid.m4a"
         f.write_bytes(b"\x00" * 100000)  # Mock large enough file
 
         mock_proc = MagicMock()
@@ -32,7 +32,7 @@ class TestAudioDownloader:
 
     @pytest.mark.asyncio
     async def test_validate_audio_file_invalid(self, downloader, tmp_path):
-        f = tmp_path / "corrupt.mp3"
+        f = tmp_path / "corrupt.m4a"
         f.write_bytes(b"\x00" * 100)  # Too small
 
         res = await downloader.validate_audio_file(f)
@@ -51,7 +51,7 @@ class TestAudioDownloader:
         # Determine the expected path
         hq_folder = Path(downloader.cfg.OUTPUT_FOLDER_HQ)
         hq_folder.mkdir(parents=True, exist_ok=True)
-        output_file = hq_folder / f"{track.safe_filename}.mp3"
+        output_file = hq_folder / f"{track.safe_filename}.m4a"
         output_file.write_bytes(b"\x00" * 100000)
 
         # Mock validate_audio_file to return True (existing file is valid)
@@ -65,7 +65,7 @@ class TestAudioDownloader:
     async def test_transcode_mp3(self, downloader, tmp_path):
         input_f = tmp_path / "input.webm"
         input_f.write_bytes(b"dummy content")
-        output_f = tmp_path / "output.mp3"
+        output_f = tmp_path / "output.m4a"
 
         mock_proc = MagicMock()
         mock_proc.returncode = 0
@@ -111,7 +111,7 @@ class TestAudioDownloader:
 
     def test_build_ffmpeg_cmd(self, downloader):
         in_p = Path("in.webm")
-        out_p = Path("out.mp3")
+        out_p = Path("out.m4a")
         downloader._build_ffmpeg_cmd(in_p, out_p, "320")
 
     @pytest.mark.asyncio

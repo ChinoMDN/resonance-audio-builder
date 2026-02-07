@@ -64,7 +64,7 @@ class TestDownloaderFull:
         """verify transcode logic call arguments"""
         input_file = tmp_path / "input.webm"
         input_file.touch()
-        output_file = tmp_path / "output.mp3"
+        output_file = tmp_path / "output.m4a"
         output_file.write_text("data")
 
         with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock_exec:

@@ -191,15 +191,25 @@ class App:
                 for row in rows:
                     t = TrackMetadata.from_csv_row(row)
                     setattr(t, "playlist_subfolder", playlist_name)
+                    # Initialize playlists list to track which playlists this song belongs to
+                    setattr(t, "playlists", [playlist_name])
                     all_tracks.append(t)
         return all_tracks
 
     def _deduplicate_tracks(self, tracks: List[TrackMetadata]) -> List[TrackMetadata]:
-        """Elimina canciones duplicadas por ID"""
+        """Elimina canciones duplicadas por ID pero mantiene referencia de todas las playlists"""
         unique = {}
         for t in tracks:
             if t.track_id not in unique:
                 unique[t.track_id] = t
+            else:
+                # Merge playlists - this track appears in multiple playlists
+                existing = unique[t.track_id]
+                existing_playlists = getattr(existing, "playlists", [])
+                new_playlists = getattr(t, "playlists", [])
+                # Combine and deduplicate playlist names
+                merged_playlists = list(set(existing_playlists + new_playlists))
+                setattr(existing, "playlists", merged_playlists)
         return list(unique.values())
 
     def _get_selected_csvs(self, csv_files: Optional[List[str]]) -> List[str]:
@@ -258,10 +268,13 @@ class App:
             console.input("\n[bold cyan]Presiona ENTER para volver...[/bold cyan]")
             return
 
-        tracks = [TrackMetadata.from_csv_row(row) for row in rows]
-
-        # Eliminar de procesadas para que se reintenten
-        # pass
+        tracks = []
+        for row in rows:
+            t = TrackMetadata.from_csv_row(row)
+            # Restore playlist_subfolder if it exists in the CSV
+            if "playlist_subfolder" in row and row["playlist_subfolder"]:
+                setattr(t, "playlist_subfolder", row["playlist_subfolder"])
+            tracks.append(t)
 
         # Eliminar duplicados
         unique = {}

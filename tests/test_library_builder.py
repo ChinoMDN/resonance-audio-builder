@@ -218,8 +218,8 @@ class TestExportM3U:
 
     def test_export_m3u(self):
         tracks = [
-            ("/path/to/song1.mp3", "Song 1", 180),
-            ("/path/to/song2.mp3", "Song 2", 240),
+            ("/path/to/song1.m4a", "Song 1", 180),
+            ("/path/to/song2.m4a", "Song 2", 240),
         ]
 
         fd, filepath = tempfile.mkstemp(suffix=".m3u")

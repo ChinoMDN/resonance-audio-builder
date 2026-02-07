@@ -12,9 +12,9 @@
     "rate_limit_delay_max": 2.0,
     "normalize_audio": true,
     "verify_md5": true,
-    "generate_m3u": false,
+    "generate_m3u": true,
     "save_history": true,
     "debug_mode": false,
-    "output_format": "mp3",
+    "output_format": "m4a",
     "embed_lyrics": true
 }

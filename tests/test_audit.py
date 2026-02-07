@@ -14,15 +14,15 @@ class TestAudioAuditor:
         # Create dummy structure
         hq_dir = tmp_path / "HQ"
         hq_dir.mkdir()
-        track1 = hq_dir / "test1.mp3"
+        track1 = hq_dir / "test1.m4a"
         track1.write_bytes(b"dummy")
 
-        with patch("resonance_audio_builder.audio.audit.MP3") as mock_mp3:
-            # Mock MP3 tags
+        with patch("resonance_audio_builder.audio.audit.MP4") as mock_mp4:
+            # Mock MP4 tags
             mock_audio = MagicMock()
-            mock_audio.keys.return_value = ["TIT2", "TPE1", "APIC", "USLT"]
-            mock_audio.__contains__.side_effect = lambda k: k in ["TIT2", "TPE1"]
-            mock_mp3.return_value = mock_audio
+            mock_audio.keys.return_value = ["\xa9nam", "\xa9ART", "covr", "\xa9lyr"]
+            mock_audio.__contains__.side_effect = lambda k: k in ["\xa9nam", "\xa9ART", "covr", "\xa9lyr"]
+            mock_mp4.return_value = mock_audio
 
             res = auditor._audit_folder(hq_dir, check_spectral=False)
 
@@ -35,15 +35,15 @@ class TestAudioAuditor:
     def test_audit_folder_missing_tags(self, auditor, tmp_path):
         hq_dir = tmp_path / "HQ"
         hq_dir.mkdir()
-        track1 = hq_dir / "missing.mp3"
+        track1 = hq_dir / "missing.m4a"
         track1.write_bytes(b"dummy")
 
-        with patch("resonance_audio_builder.audio.audit.MP3") as mock_mp3:
+        with patch("resonance_audio_builder.audio.audit.MP4") as mock_mp4:
             mock_audio = MagicMock()
             # Missing everything
             mock_audio.keys.return_value = []
             mock_audio.__contains__.return_value = False
-            mock_mp3.return_value = mock_audio
+            mock_mp4.return_value = mock_audio
 
             res = auditor._audit_folder(hq_dir, check_spectral=False)
 
@@ -55,14 +55,14 @@ class TestAudioAuditor:
     def test_audit_folder_spectral(self, auditor, tmp_path):
         hq_dir = tmp_path / "HQ"
         hq_dir.mkdir()
-        track1 = hq_dir / "fake.mp3"
+        track1 = hq_dir / "fake.m4a"
         track1.write_bytes(b"dummy")
 
-        with patch("resonance_audio_builder.audio.audit.MP3"):
+        with patch("resonance_audio_builder.audio.audit.MP4"):
             with patch.object(auditor.analyzer, "analyze_integrity", return_value=False):
                 res = auditor._audit_folder(hq_dir, check_spectral=True)
                 assert len(res.fake_hq_detected) == 1
-                assert res.fake_hq_detected[0] == "fake.mp3"
+                assert res.fake_hq_detected[0] == "fake.m4a"
 
     def test_scan_library_integration(self, auditor, tmp_path):
         hq_dir = tmp_path / "HQ"
@@ -70,10 +70,10 @@ class TestAudioAuditor:
         mob_dir = tmp_path / "MOB"
         mob_dir.mkdir()
 
-        (hq_dir / "hq.mp3").touch()
-        (mob_dir / "mob.mp3").touch()
+        (hq_dir / "hq.m4a").touch()
+        (mob_dir / "mob.m4a").touch()
 
-        with patch("resonance_audio_builder.audio.audit.MP3"):
+        with patch("resonance_audio_builder.audio.audit.MP4"):
             results = auditor.scan_library(hq_dir, mob_dir)
             assert "HQ" in results
             assert "Mobile" in results

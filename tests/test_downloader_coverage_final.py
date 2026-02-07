@@ -31,8 +31,8 @@ class TestDownloaderCoverageFinal:
     @pytest.mark.asyncio
     async def test_transcode_timeout(self, downloader, tmp_path):
         """Test FFmpeg timeout handling"""
-        input_file = tmp_path / "input.mp3"
-        output_file = tmp_path / "output.mp3"
+        input_file = tmp_path / "input.m4a"
+        output_file = tmp_path / "output.m4a"
 
         with patch("pathlib.Path.exists", return_value=True):
             with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 300)):

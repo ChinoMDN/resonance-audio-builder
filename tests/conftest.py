@@ -21,7 +21,7 @@ def sample_mp3_320k(tmp_path):
     # Note: Real spectral analysis needs real audio.
     # For unit tests, we might mock analyze_integrity or use a very small real valid MP3.
     # Here we create a dummy file for file existence checks.
-    f = tmp_path / "test_320.mp3"
+    f = tmp_path / "test_320.m4a"
     f.write_bytes(b"ID3" + b"\x00" * 1000)  # Fake header
     return f
 
@@ -29,7 +29,7 @@ def sample_mp3_320k(tmp_path):
 @pytest.fixture
 def fake_mp3_upscaled(tmp_path):
     """Creates a dummy MP3 file that simulates fake upscaled"""
-    f = tmp_path / "fake_128_up.mp3"
+    f = tmp_path / "fake_128_up.m4a"
     f.write_bytes(b"ID3" + b"\x00" * 500)
     return f
 
