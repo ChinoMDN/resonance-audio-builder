@@ -42,7 +42,7 @@ Many personal audio collections suffer from:
 - Inconsistent loudness levels across tracks
 - Incomplete or inaccurate metadata
 - Lack of embedded lyrics
-- Poor or inconsistent transcoding quality
+- Smart Transcoding: Automatically uses AAC (M4A) for mobile profiles to maximize quality per bit, and supports archival-grade metadata.
 
 Resonance focuses on **library quality and consistency**, providing:
 
@@ -141,20 +141,20 @@ Edit `config.json` to customize behavior:
 
 ### Configuration Options
 
-| Option                   | Default        | Description                             |
-| ------------------------ | -------------- | --------------------------------------- |
-| `output_folder_hq`       | `Audio_HQ`     | Folder for high-quality output          |
-| `output_folder_mobile`   | `Audio_Mobile` | Folder for low-bitrate output           |
-| `quality_hq_bitrate`     | `320`          | Bitrate for HQ profile                  |
-| `quality_mobile_bitrate` | `96`           | Bitrate for mobile profile              |
-| `max_workers`            | `3`            | Concurrent processing threads           |
-| `normalize_audio`        | `true`         | Enable EBU R128 normalization           |
-| `embed_lyrics`           | `true`         | Retrieve and embed lyrics               |
-| `output_format`          | `mp3`          | Output format: `mp3`, `flac`, or `copy` |
-| `rate_limit_delay_min`   | `0.5`          | Minimum delay between requests          |
-| `rate_limit_delay_max`   | `2.0`          | Maximum delay between requests          |
-| `generate_m3u`           | `true`         | Generate playlist file                  |
-| `save_history`           | `true`         | Save session history                    |
+| Option                   | Default        | Description                                                  |
+| ------------------------ | -------------- | ------------------------------------------------------------ |
+| `output_folder_hq`       | `Audio_HQ`     | Folder for high-quality output                               |
+| `output_folder_mobile`   | `Audio_Mobile` | Folder for low-bitrate output                                |
+| `quality_hq_bitrate`     | `320`          | Bitrate for HQ profile                                       |
+| `quality_mobile_bitrate` | `96`           | Bitrate for mobile profile                                   |
+| `max_workers`            | `3`            | Concurrent processing threads                                |
+| `normalize_audio`        | `true`         | Enable EBU R128 normalization                                |
+| `embed_lyrics`           | `true`         | Retrieve and embed lyrics                                    |
+| `output_format`          | `m4a`          | Output format: `m4a` (Recommended), `mp3`, `flac`, or `copy` |
+| `rate_limit_delay_min`   | `0.5`          | Minimum delay between requests                               |
+| `rate_limit_delay_max`   | `2.0`          | Maximum delay between requests                               |
+| `generate_m3u`           | `true`         | Generate playlist file                                       |
+| `save_history`           | `true`         | Save session history                                         |
 
 ---
 

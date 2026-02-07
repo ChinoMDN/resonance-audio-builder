@@ -38,6 +38,11 @@ class DownloadManager:
         # Init Proxy Manager (Async compliant)
         self.proxy_manager = SmartProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
 
+        # Init Circuit Breaker (3 failures in 300s -> Stop)
+        from resonance_audio_builder.network.limiter import CircuitBreaker
+
+        self.circuit_breaker = CircuitBreaker(threshold=3, cooldown=300)
+
         self.downloader = AudioDownloader(self.cfg, self.log, self.proxy_manager)
         self.searcher = YouTubeSearcher(self.cfg, self.log, self.cache, self.proxy_manager)
         self.metadata_writer = MetadataWriter(self.log)
@@ -118,6 +123,53 @@ class DownloadManager:
             self._save_failed()
             self._print_summary()
 
+    async def _worker(self):
+        """Async worker modularizado"""
+        while True:
+            try:
+                # 0. Check Circuit Breaker
+                try:
+                    self.circuit_breaker.check()
+                except Exception as e:
+                    self.log.warning(str(e))
+                    await asyncio.sleep(10)
+                    continue
+
+                track = await self.queue.get()
+                if self.keyboard.is_paused():
+                    await asyncio.sleep(0.5)
+
+                if self.keyboard.should_quit():
+                    self.queue.task_done()
+                    return
+
+                if self.keyboard.should_skip():
+                    self.state.mark(track, "skip")
+                    self.ui.update_main_progress(1)
+                    self.queue.task_done()
+                    continue
+
+                task_id = self.ui.add_download_task(track.artist, track.title)
+                try:
+                    success = await self._process_track_attempts(track, task_id)
+                    if not success:
+                        # Decide if this is a circuit-breaking failure?
+                        # _process_track_attempts swallows errors but returns False
+                        # We might need to inspect why it failed, but for now
+                        # we can leave record_failure to the fatal error handler
+                        pass
+                finally:
+                    if task_id:
+                        await asyncio.sleep(2.0)
+                        self.ui.remove_task(task_id)
+                    self.queue.task_done()
+
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                self.log.error(f"Worker loop error: {e}")
+                await asyncio.sleep(1)
+
     def _print_batch_summary(self, tracks: List[TrackMetadata], pending: List[TrackMetadata]):
         """Muestra el resumen visual de la cola de descarga"""
         table = Table(title=f"Download Queue ({len(pending)} pending)", expand=True, box=None)
@@ -170,7 +222,11 @@ class DownloadManager:
                 return False
             attempt += 1
 
-            success, is_fatal, error = await self._attempt_download_iteration(track, task_id, attempt)
+            try:
+                success, is_fatal, error = await self._attempt_download_iteration(track, task_id, attempt)
+            except Exception:
+                raise
+
             if success:
                 return True
 
@@ -215,10 +271,17 @@ class DownloadManager:
             self.ui.update_task_status(task_id, status)
             self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
             self.ui.update_main_progress(1)
+
+            # Record success to close breaker if half-open
+            self.circuit_breaker.record_success()
+
             return True, False, ""
 
         except FatalError as e:
             self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
+            # Critical errors (429, 403) trip the breaker
+            if "429" in str(e) or "403" in str(e) or "Banned" in str(e):
+                self.circuit_breaker.record_failure()
             return False, True, str(e)
         except RecoverableError as e:
             self.ui.update_task_status(task_id, f"[yellow]Retry: {e}[/yellow]")
@@ -227,39 +290,6 @@ class DownloadManager:
             self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
             self.log.debug(f"Unexpected error for {track.title}: {traceback.format_exc()}")
             return False, True, str(e)
-
-    async def _worker(self):
-        """Async worker modularizado"""
-        while True:
-            try:
-                track = await self.queue.get()
-                if self.keyboard.is_paused():
-                    await asyncio.sleep(0.5)
-
-                if self.keyboard.should_quit():
-                    self.queue.task_done()
-                    return
-
-                if self.keyboard.should_skip():
-                    self.state.mark(track, "skip")
-                    self.ui.update_main_progress(1)
-                    self.queue.task_done()
-                    continue
-
-                task_id = self.ui.add_download_task(track.artist, track.title)
-                try:
-                    await self._process_track_attempts(track, task_id)
-                finally:
-                    if task_id:
-                        await asyncio.sleep(2.0)
-                        self.ui.remove_task(task_id)
-                    self.queue.task_done()
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                self.log.error(f"Worker loop error: {e}")
-                await asyncio.sleep(1)
 
     def _save_failed(self):
         if not self.failed_tracks:

@@ -124,8 +124,6 @@ class TrackMetadata:
         duration_str = get_val("track duration (ms)", "duration_ms", "duration")
         duration = int(duration_str) if duration_str and duration_str.isdigit() else 0
 
-        # ... (rest of the method unchanged until return)
-
         # Parse explicit field
         explicit_str = get_val("explicit").lower()
         explicit = explicit_str in ("true", "1", "yes")
@@ -180,8 +178,10 @@ class TrackMetadata:
         # 1. Reemplazo inteligente de barras por guiones (AC/DC -> AC-DC)
         name = name.replace("/", "-").replace("\\", "-")
 
-        # 2. Caracteres prohibidos en Windows y Shell (pero permitimos parentesis y corchetes)
-        # Prohibidos: < > : " | ? * y también ; $ # & ! { } (peligrosos en shell)
+        # 2. Caracteres prohibidos en Windows y Shell
+        # (pero permitimos parentesis y corchetes)
+        # Prohibidos: < > : " | ? * y también ; $ # & ! { }
+        # (peligrosos en shell)
         invalids = '<>:"|?*;$#&!{}'
         for char in invalids:
             name = name.replace(char, "")

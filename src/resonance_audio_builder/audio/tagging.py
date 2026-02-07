@@ -23,7 +23,8 @@ class MetadataWriter:
         self._enrich_metadata(meta)
 
         print(f"DEBUG: Processing {path}")
-        # Mecanismo de reintento por si el archivo está bloqueado por Windows/Antivirus
+        # Mecanismo de reintento por si el archivo está bloqueado por Windows
+        # o Antivirus
         max_retries = 3
         for i in range(max_retries):
             try:
@@ -36,7 +37,8 @@ class MetadataWriter:
 
     def _enrich_metadata(self, meta: TrackMetadata):
         """Enriquece los metadatos con MusicBrainz si está disponible"""
-        # Solo buscar si tenemos ISRC y no tenemos ya los datos (para evitar re-fetch si se llama varias veces)
+        # Solo buscar si tenemos ISRC y no tenemos ya los datos
+        # (para evitar re-fetch si se llama varias veces)
         if not meta.isrc or (meta.composers or meta.producers):
             return
 
@@ -55,10 +57,12 @@ class MetadataWriter:
         try:
             audio = MP4(path)
         except Exception:
-            # If failing to open, maybe it's corrupted or locked. Try passing simply path string
+            # If failing to open, maybe it's corrupted or locked.
+            # Try passing simply path string
             audio = MP4(str(path))
 
-        # En M4A, si no existen tags, mutagen los crea automáticamente al asignar claves.
+        # En M4A, si no existen tags, mutagen los crea automáticamente
+        # al asignar claves.
         # Las claves de M4A son "Átomos" de 4 letras.
 
         # --- 1. Textos Básicos ---
@@ -73,7 +77,8 @@ class MetadataWriter:
             audio["\xa9alb"] = meta.album
 
         if meta.album_artist:
-            audio["aART"] = meta.album_artist  # Nota: aART sin el símbolo de copyright
+            # Nota: aART sin el símbolo de copyright
+            audio["aART"] = meta.album_artist
 
         if meta.release_date and len(meta.release_date) >= 4:
             audio["\xa9day"] = meta.release_date[:4]  # Año
@@ -92,7 +97,8 @@ class MetadataWriter:
         # Publisher / Label
         if meta.label:
             try:
-                # \xa9pub es el átomo estándar para Publisher en algunos contextos
+                # \xa9pub es el átomo estándar para Publisher
+                # en algunos contextos
                 audio["\xa9pub"] = meta.label
             except Exception:
                 pass

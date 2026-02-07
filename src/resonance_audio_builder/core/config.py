@@ -51,8 +51,8 @@ class Config:
     SAVE_HISTORY: bool = True
     QUIET_MODE: bool = False
 
-    # v5.1 - Formato de salida: 'mp3', 'flac', o 'copy' (mantener original)
-    OUTPUT_FORMAT: str = "mp3"
+    # v5.1 - Formato de salida: 'm4a', 'flac', o 'copy' (mantener original)
+    OUTPUT_FORMAT: str = "m4a"
     EMBED_LYRICS: bool = True
 
     # v7.0 - Spectral Analysis

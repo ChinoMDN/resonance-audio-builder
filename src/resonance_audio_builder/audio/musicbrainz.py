@@ -46,12 +46,12 @@ def fetch_credits(isrc: str) -> dict:
     try:
         # MusicBrainz requires a custom User-Agent
         headers = {
-            "User-Agent": "ResonanceAudioBuilder/1.0 (https://github.com/resonance)",
+            "User-Agent": ("ResonanceAudioBuilder/1.0 (https://github.com/resonance)"),
             "Accept": "application/json",
         }
 
         # Search by ISRC
-        url = f"https://musicbrainz.org/ws/2/recording?query=isrc:{isrc}&fmt=json"
+        url = "https://musicbrainz.org/ws/2/recording" f"?query=isrc:{isrc}&fmt=json"
         resp = _rate_limited_get(url, headers=headers, timeout=5)
 
         if resp.status_code != 200:
@@ -71,7 +71,7 @@ def fetch_credits(isrc: str) -> dict:
             return {}
 
         # Fetch detailed recording info with artist-rels
-        detail_url = f"https://musicbrainz.org/ws/2/recording/{recording_id}?inc=artist-rels+work-rels&fmt=json"
+        detail_url = f"https://musicbrainz.org/ws/2/recording/{recording_id}" "?inc=artist-rels+work-rels&fmt=json"
         detail_resp = _rate_limited_get(detail_url, headers=headers, timeout=5)
 
         if detail_resp.status_code != 200:
@@ -123,7 +123,7 @@ def fetch_credits(isrc: str) -> dict:
 def _fetch_work_composers(work_id: str, headers: dict) -> list:
     """Fetch composers from a work entity"""
     try:
-        url = f"https://musicbrainz.org/ws/2/work/{work_id}?inc=artist-rels&fmt=json"
+        url = f"https://musicbrainz.org/ws/2/work/{work_id}" "?inc=artist-rels&fmt=json"
         resp = _rate_limited_get(url, headers=headers, timeout=5)
 
         if resp.status_code != 200:

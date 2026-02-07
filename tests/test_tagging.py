@@ -87,7 +87,12 @@ class TestMetadataWriter:
         f = tmp_path / "extended.m4a"
         f.touch()
         track = TrackMetadata(
-            track_id="id_ext", title="Extended", artist="Artist", isrc="US1234567890", added_by="UserX", popularity=50
+            track_id="id_ext",
+            title="Extended",
+            artist="Artist",
+            isrc="US1234567890",
+            added_by="UserX",
+            popularity=50,
         )
 
         # Mock fetch_credits to verify enrichment
@@ -96,12 +101,17 @@ class TestMetadataWriter:
             patch("resonance_audio_builder.audio.tagging.MP4") as mock_mp4,
         ):
 
-            mock_fetch.return_value = {"composers": ["Mozart"], "producers": ["Dr. Dre"], "engineers": []}
+            mock_fetch.return_value = {
+                "composers": ["Mozart"],
+                "producers": ["Dr. Dre"],
+                "engineers": [],
+            }
 
             mock_audio = MagicMock()
             mock_mp4.return_value = mock_audio
 
-            # Capture writes to a real dict because MagicMock calls are hard to check for specific key/value pairs
+            # Capture writes to a real dict because MagicMock calls are hard to
+            # check for specific key/value pairs
             store = {}
 
             def setitem(key, val):
