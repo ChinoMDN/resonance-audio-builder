@@ -196,9 +196,10 @@ class TestAudioDownloader:
     async def test_download_with_quit_signal(self, downloader, tmp_path):
         """Test download respects quit signal"""
         from resonance_audio_builder.core.config import QualityMode
+
         downloader.cfg.MODE = QualityMode.HQ_ONLY
         downloader.cfg.OUTPUT_FOLDER_HQ = str(tmp_path / "HQ")
-        
+
         with patch.object(downloader, "_download_raw", AsyncMock(return_value=tmp_path / "raw")):
             res = await downloader.download(MagicMock(), MagicMock(), check_quit=lambda: True)
             assert res.skipped is True
@@ -207,6 +208,7 @@ class TestAudioDownloader:
     async def test_transcode_timeout(self, downloader, tmp_path):
         """Test FFmpeg timeout handling"""
         import subprocess
+
         with patch("pathlib.Path.exists", return_value=True):
             with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 300)):
                 result = await downloader._transcode(Path("in"), Path("out"), "320")

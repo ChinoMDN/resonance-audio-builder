@@ -80,6 +80,7 @@ async def test_circuit_breaker_record_success(manager):
 def test_circuit_breaker_state_logic():
     """Test the internal state transitions of CircuitBreaker"""
     from resonance_audio_builder.network.limiter import CircuitBreaker
+
     cb = CircuitBreaker(threshold=1, cooldown=1)
     cb.record_failure()
     assert cb.state == "OPEN"

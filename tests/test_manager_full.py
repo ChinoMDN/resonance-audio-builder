@@ -234,9 +234,11 @@ class TestManagerFullCoverage:
         assert success is False
         assert fatal is True
         assert "Extreme Error" in err
+
     def test_save_failed_logic(self, manager):
         """Test saving failed tracks to file"""
         from unittest.mock import mock_open
+
         track = TrackMetadata("id1", "T", "A")
         manager.failed_tracks.append((track, "Err"))
         manager.cfg.ERROR_FILE = "err.txt"

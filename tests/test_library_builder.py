@@ -334,7 +334,7 @@ class TestCacheManager:
         cm = CacheManager(str(filepath))
         cm.lock = MagicMock()
         cm.lock.acquire.return_value = False
-        cm.clear() # Should exit early
+        cm.clear()  # Should exit early
         assert cm.lock.acquire.called
 
 

@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -19,7 +19,6 @@ class TestAppFull:
                 # Test that watch_mode calls start_observer
                 app.watch_mode(str(tmp_path))
                 mock_observer.assert_called_once()
-
 
     def test_run_cli_args(self, app):
         """Test CLI argument parsing"""
