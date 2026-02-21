@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -311,25 +312,30 @@ class TestCacheManager:
             except Exception:
                 pass
 
-    def test_expiry(self):
-        fd, filepath = tempfile.mkstemp(suffix=".db")
-        os.close(fd)
-        try:
-            cache = CacheManager(filepath)
-            cache.set("old_key", {"url": "u", "title": "t", "duration": 1})
+    def test_expiry(self, tmp_path):
+        filepath = tmp_path / "expiry.db"
+        cache = CacheManager(str(filepath))
+        cache.set("old", {"url": "u"})
+        with cache.lock:
+            cache.cursor.execute("UPDATE cache SET timestamp = timestamp - 100000")
+            cache.conn.commit()
+        assert cache.get("old", ttl_hours=1) is None
 
-            # Manually backdate the timestamp in DB
-            with cache.lock:
-                cache.cursor.execute("UPDATE cache SET timestamp = timestamp - 100000")
-                cache.conn.commit()
+    def test_cache_exception_handling(self):
+        """Test cache robustness when DB fails"""
+        with patch("sqlite3.connect", side_effect=Exception("Fail")):
+            cm = CacheManager("bad.db")
+            assert cm.get("k", ttl_hours=1) is None
+            assert cm.count() == 0
 
-            # Should be expired (ttl=1 hour = 3600s)
-            assert cache.get("old_key", ttl_hours=1) is None
-        finally:
-            try:
-                os.unlink(filepath)
-            except Exception:
-                pass
+    def test_cache_lock_fail(self, tmp_path):
+        """Test cache when lock acquisition fails"""
+        filepath = tmp_path / "lock.db"
+        cm = CacheManager(str(filepath))
+        cm.lock = MagicMock()
+        cm.lock.acquire.return_value = False
+        cm.clear() # Should exit early
+        assert cm.lock.acquire.called
 
 
 if __name__ == "__main__":

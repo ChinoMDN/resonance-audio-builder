@@ -38,7 +38,7 @@ class DownloadResult:
     """Result of a single download operation."""
 
     success: bool
-    bytes: int
+    bytes: int = 0
     error: str = None
     skipped: bool = False
     fake_hq: bool = False
@@ -135,6 +135,8 @@ class AudioDownloader:
         self, search_result: SearchResult, track: TrackMetadata, check_quit=None, subfolder: str = ""
     ) -> DownloadResult:
         """Async download pipeline"""
+        if check_quit and check_quit():
+            return DownloadResult(success=True, skipped=True)
         raw_path = None
         try:
             # 1. Setup paths and check existence

@@ -109,10 +109,7 @@ class TestApp:
 
     def test_read_csv_encodings(self, app, tmp_path):
         f = tmp_path / "latin1.csv"
-        # Track Name, Artist Name(s) in latin-1
         f.write_bytes("Canción,Artista\nTest,Test".encode("latin-1"))
-
-        # We need to mock the header detection or just ensure it returns rows
         with patch("resonance_audio_builder.core.builder.csv.DictReader") as mock_reader:
             mock_inst = MagicMock()
             mock_inst.fieldnames = ["Track Name"]
@@ -120,3 +117,32 @@ class TestApp:
             mock_reader.return_value = mock_inst
             rows = app._read_csv(str(f))
             assert len(rows) > 0
+
+    def test_read_csv_malformed(self, app, tmp_path):
+        """Test handling of malformed CSV"""
+        f = tmp_path / "bad.csv"
+        # If headers are missing or random, DictReader still returns rows
+        # but the App might filter them later in the flow.
+        f.write_text("random,noise,data\n1,2,3", encoding="utf-8")
+        rows = app._read_csv(str(f))
+        assert len(rows) == 1
+
+    def test_clear_cache_data(self, app):
+        """Test clearing search cache"""
+        app.cache = MagicMock()
+        app._clear_cache_data()
+        assert app.cache.clear.called
+
+    def test_retry_failed_with_errors(self, app, tmp_path):
+        """Test retry flow with actual failed tracks"""
+        f = tmp_path / "failed.csv"
+        f.write_text("Track Name,Artist Name(s)\nRetrySong,Artist", encoding="utf-8")
+        app.cfg.ERROR_CSV = str(f)
+        with (
+            patch("resonance_audio_builder.core.builder.console.print"),
+            patch("resonance_audio_builder.core.builder.Prompt.ask", return_value="y"),
+            patch("resonance_audio_builder.core.manager.Confirm.ask", return_value=True),
+            patch.object(app, "_start_download") as mock_start,
+        ):
+            app._retry_failed()
+            assert mock_start.called

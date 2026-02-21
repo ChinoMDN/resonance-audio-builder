@@ -1,8 +1,10 @@
+import io
 import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from PIL import Image
 
 from resonance_audio_builder.audio.downloader import AudioDownloader, DownloadResult
 from resonance_audio_builder.audio.metadata import TrackMetadata
@@ -145,3 +147,67 @@ class TestAudioDownloader:
         e = Exception("This video is not available in your country")
         with pytest.raises(GeoBlockError):
             downloader._handle_ytdlp_error(e, None)
+
+    @pytest.mark.asyncio
+    async def test_perform_transcoding_pipeline(self, downloader):
+        """Test the orchestration of transcoding tasks"""
+        downloader._transcode = AsyncMock(return_value=True)
+        downloader._inject_metadata = AsyncMock()
+
+        raw, hq, mob = Path("raw"), Path("hq"), Path("mob")
+        track = TrackMetadata("id", "t", "a")
+
+        with patch.object(Path, "stat") as mock_stat:
+            mock_stat.return_value.st_size = 100
+            success, bytes_n = await downloader._perform_transcoding_pipeline(raw, hq, mob, track, True, True)
+            assert success is True
+            assert bytes_n == 200
+            assert downloader._transcode.call_count == 2
+
+    def test_resize_cover(self, downloader):
+        """Test cover art resizing logic"""
+        img = Image.new("RGB", (100, 100), color="red")
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG")
+        original_bytes = buffer.getvalue()
+
+        resized_bytes = downloader._resize_cover_sync(original_bytes, max_size=50)
+        assert len(resized_bytes) > 0
+        resized_img = Image.open(io.BytesIO(resized_bytes))
+        assert resized_img.size[0] <= 50
+
+    @pytest.mark.asyncio
+    async def test_download_raw_full(self, downloader, tmp_path):
+        """Test full flow of _download_raw"""
+        dl_path = tmp_path / "downloads"
+        dl_path.mkdir()
+
+        with patch("yt_dlp.YoutubeDL") as mock_ydl_cls:
+            mock_ydl = mock_ydl_cls.return_value
+            mock_ydl.__enter__.return_value = mock_ydl
+            mock_ydl.extract_info.return_value = {"id": "vid1", "title": "Song"}
+            mock_ydl.prepare_filename.return_value = str(dl_path / "song.webm")
+
+            result = await downloader._download_raw("http://url", "name")
+            assert isinstance(result, Path)
+            assert mock_ydl.extract_info.called
+
+    @pytest.mark.asyncio
+    async def test_download_with_quit_signal(self, downloader, tmp_path):
+        """Test download respects quit signal"""
+        from resonance_audio_builder.core.config import QualityMode
+        downloader.cfg.MODE = QualityMode.HQ_ONLY
+        downloader.cfg.OUTPUT_FOLDER_HQ = str(tmp_path / "HQ")
+        
+        with patch.object(downloader, "_download_raw", AsyncMock(return_value=tmp_path / "raw")):
+            res = await downloader.download(MagicMock(), MagicMock(), check_quit=lambda: True)
+            assert res.skipped is True
+
+    @pytest.mark.asyncio
+    async def test_transcode_timeout(self, downloader, tmp_path):
+        """Test FFmpeg timeout handling"""
+        import subprocess
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 300)):
+                result = await downloader._transcode(Path("in"), Path("out"), "320")
+                assert result is False

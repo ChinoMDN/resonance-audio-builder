@@ -312,8 +312,8 @@ class DownloadManager:
                         # Add playlist_subfolder if it exists
                         row_data["playlist_subfolder"] = getattr(track, "playlist_subfolder", "")
                         writer.writerow(row_data)
-        except Exception:
-            pass
+        except Exception as e:
+            self.log.error(f"Failed to record failed tracks: {e}")
 
     def _print_summary(self):
         """Imprime resumen final con Rich"""

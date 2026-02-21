@@ -70,11 +70,18 @@ async def test_circuit_breaker_no_record_on_generic_fatal(manager):
 @pytest.mark.asyncio
 async def test_circuit_breaker_record_success(manager):
     track = TrackMetadata(track_id="1", title="T", artist="A")
-
     # Simulate success
     manager.searcher.search = AsyncMock(return_value="result")
     manager.downloader.download = AsyncMock(return_value=MagicMock(success=True, skipped=False, bytes=100))
-
     await manager._process_track_attempts(track, "task1")
-
     manager.circuit_breaker.record_success.assert_called_once()
+
+
+def test_circuit_breaker_state_logic():
+    """Test the internal state transitions of CircuitBreaker"""
+    from resonance_audio_builder.network.limiter import CircuitBreaker
+    cb = CircuitBreaker(threshold=1, cooldown=1)
+    cb.record_failure()
+    assert cb.state == "OPEN"
+    with pytest.raises(Exception):
+        cb.check()
