@@ -3,7 +3,7 @@
     "output_folder_mobile": "Audio_Mobile",
     "quality_hq_bitrate": "320",
     "quality_mobile_bitrate": "96",
-    "max_workers": 3,
+    "max_workers": 4,
     "max_retries": 3,
     "duration_tolerance": 15,
     "search_timeout": 30,

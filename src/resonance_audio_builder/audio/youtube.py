@@ -19,6 +19,8 @@ from resonance_audio_builder.network.utils import USER_AGENTS, validate_cookies_
 
 @dataclass
 class SearchResult:
+    """Result from a YouTube search query."""
+
     url: str
     title: str
     duration: int
@@ -26,6 +28,8 @@ class SearchResult:
 
 
 class YouTubeSearcher:
+    """Async YouTube search engine using yt-dlp with caching and proxy support."""
+
     def __init__(
         self,
         config: Config,
@@ -99,7 +103,7 @@ class YouTubeSearcher:
             "extract_flat": True,
             "noplaylist": True,
             "socket_timeout": self.cfg.SEARCH_TIMEOUT,
-            "http_headers": {"User-Agent": random.choice(USER_AGENTS)},
+            "http_headers": {"User-Agent": random.choice(USER_AGENTS)},  # nosec B311
         }
 
         if self.proxy_manager:
@@ -156,9 +160,7 @@ class YouTubeSearcher:
             if self.proxy_manager and "proxy" in opts:
                 self.proxy_manager.mark_failure(opts["proxy"])
 
-            # Raise wrapped error? Or just return None allows retry?
-            # For now return None to treat as 'not found' in this attempt
-            pass
+            # Return None to treat as 'not found' in this attempt
 
         return None
 

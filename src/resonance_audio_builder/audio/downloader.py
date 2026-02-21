@@ -35,6 +35,8 @@ from resonance_audio_builder.network.utils import USER_AGENTS, validate_cookies_
 
 @dataclass
 class DownloadResult:
+    """Result of a single download operation."""
+
     success: bool
     bytes: int
     error: str = None
@@ -43,12 +45,15 @@ class DownloadResult:
 
 
 class AudioDownloader:
+    """Async audio downloader with transcoding and metadata injection."""
+
     def __init__(self, config: Config, logger: Logger, proxy_manager: Optional[SmartProxyManager] = None):
         self.cfg = config
         self.log = logger
         self._cookies_valid = validate_cookies_file(config.COOKIES_FILE)
         self.analyzer = AudioAnalyzer(logger)
         self.proxy_manager = proxy_manager
+        self._cover_cache: dict[str, Optional[bytes]] = {}
         # Note: Searcher is passed or instantiated outside usually, but manager keeps it.
         # If downloader needs to search, it should take searcher as dependency or arg,
         # but here we pass search_result directly to download().
@@ -92,7 +97,7 @@ class AudioDownloader:
                 stderr=asyncio.subprocess.PIPE,
                 creationflags=0x08000000 if os.name == "nt" else 0,
             )
-            stdout, stderr = await proc.communicate()
+            stdout, _ = await proc.communicate()
 
             if proc.returncode != 0:
                 return False
@@ -212,9 +217,14 @@ class AudioDownloader:
 
     async def _fetch_metadata_assets(self, track: TrackMetadata):
         if track.cover_url:
+            # Cache covers by URL — album tracks share the same art
+            if track.cover_url in self._cover_cache:
+                track.cover_data = self._cover_cache[track.cover_url]
+                return
             track.cover_data = await self._download_cover(track.cover_url)
             if track.cover_data:
                 track.cover_data = await self._resize_cover(track.cover_data)
+            self._cover_cache[track.cover_url] = track.cover_data
 
     async def _perform_transcoding_pipeline(
         self, raw_path, hq_path, mobile_path, track, todo_hq, todo_mob
@@ -231,20 +241,27 @@ class AudioDownloader:
         total_bytes = 0
         idx = 0
 
+        # Collect successful paths for parallel metadata injection
+        meta_tasks = []
+
         if todo_hq:
             if results[idx]:
-                await self._inject_metadata(hq_path, track)
-                total_bytes += hq_path.stat().st_size
+                meta_tasks.append((hq_path, track))
             else:
                 success = False
             idx += 1
 
         if todo_mob:
             if results[idx]:
-                await self._inject_metadata(mobile_path, track)
-                total_bytes += mobile_path.stat().st_size
+                meta_tasks.append((mobile_path, track))
             else:
                 success = False
+
+        # Inject metadata in parallel for all successful transcodes
+        if meta_tasks:
+            await asyncio.gather(*(self._inject_metadata(p, t) for p, t in meta_tasks))
+            for p, _ in meta_tasks:
+                total_bytes += p.stat().st_size
 
         return success, total_bytes
 
@@ -256,17 +273,17 @@ class AudioDownloader:
                 pass
 
     async def _download_cover(self, url: str) -> Optional[bytes]:
+        """Download cover art image from the given URL."""
         if not url:
             return None
         try:
-            # Use aiohttp
             proxy = await self.proxy_manager.get_proxy_async() if self.proxy_manager else None
-            proxies = {"http": proxy, "https": proxy} if proxy else {}
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, proxy=proxies.get("https"), timeout=10) as resp:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, proxy=proxy) as resp:
                     if resp.status == 200:
                         return await resp.read()
+                    self.log.debug(f"Cover download HTTP {resp.status} for {url}")
         except Exception as e:
             self.log.debug(f"Error downloading cover: {e}")
         return None
@@ -397,7 +414,7 @@ class AudioDownloader:
             "skip_unavailable_fragments": True,
             "geo_bypass": True,
             "http_headers": {
-                "User-Agent": random.choice(USER_AGENTS),
+                "User-Agent": random.choice(USER_AGENTS),  # nosec B311
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 "Accept-Language": "en-us,en;q=0.5",
                 "Sec-Fetch-Mode": "navigate",
@@ -437,21 +454,26 @@ class AudioDownloader:
         except Exception as e:
             if self.proxy_manager and proxy:
                 self.proxy_manager.mark_failure(proxy)
-            raise YouTubeError(f"Error inesperado en yt-dlp: {e}")
+            raise YouTubeError(f"Error inesperado en yt-dlp: {e}") from e
 
     def _setup_ytdlp_logger(self):
         class FileLogger:
+            """Simple file logger for yt-dlp output."""
+
             def _log(self, prefix, msg):
                 with open("ytdlp_raw.log", "a", encoding="utf-8") as f:
                     f.write(f"[{prefix}] {msg}\n")
 
             def debug(self, msg):
+                """Log debug message."""
                 self._log("DEBUG", msg)
 
             def warning(self, msg):
+                """Log warning message."""
                 self._log("WARNING", msg)
 
             def error(self, msg):
+                """Log error message."""
                 self._log("ERROR", msg)
 
         return FileLogger()
@@ -492,12 +514,11 @@ class AudioDownloader:
 
         if "copyright" in err_str or "blocked" in err_str:
             raise CopyrightError(f"Bloqueado: {str(e)[:50]}")
-        elif "not available" in err_str or "geo" in err_str:
+        if "not available" in err_str or "geo" in err_str:
             raise GeoBlockError("No disponible en tu región")
-        elif "sign in" in err_str or "age" in err_str:
+        if "sign in" in err_str or "age" in err_str:
             raise FatalError(f"Requiere login: {str(e)[:50]}")
-        else:
-            raise YouTubeError(f"Error descarga: {str(e)}")
+        raise YouTubeError(f"Error descarga: {str(e)}")
 
     def _build_ffmpeg_cmd(self, input_path: Path, output_path: Path, bitrate: str) -> list:
         """Construye el comando ffmpeg para AAC (M4A)"""

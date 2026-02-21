@@ -10,6 +10,8 @@ import aiohttp
 
 @dataclass
 class ProxyStats:
+    """Health and performance statistics for a single proxy."""
+
     url: str
     failures: int = 0
     successes: int = 0
@@ -26,9 +28,11 @@ class ProxyManager:
         self.smart = SmartProxyManager(proxies_file, enabled)
 
     def get_proxy(self) -> Optional[str]:
+        """Get a proxy URL synchronously."""
         return self.smart.get_proxy_sync()
 
     def get_requests_proxies(self) -> Dict[str, str]:
+        """Get proxy dict for use with the requests library."""
         p = self.get_proxy()
         return {"http": p, "https": p} if p else {}
 
@@ -48,7 +52,7 @@ class SmartProxyManager:
             return
 
         try:
-            with open(self.proxies_file, "r") as f:
+            with open(self.proxies_file, "r", encoding="utf-8") as f:
                 for line in f:
                     url = line.strip()
                     if url and not url.startswith("#"):
@@ -129,10 +133,12 @@ class SmartProxyManager:
             return False
 
     def mark_success(self, proxy_url: str):
+        """Record a successful request through a proxy."""
         if proxy_url in self.proxies:
             self.proxies[proxy_url].successes += 1
 
     def mark_failure(self, proxy_url: str):
+        """Record a failed request through a proxy."""
         if proxy_url in self.proxies:
             p = self.proxies[proxy_url]
             p.failures += 1

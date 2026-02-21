@@ -55,7 +55,7 @@ class PlaylistEventHandler(FileSystemEventHandler):
         try:
             # Invocar al App builder para procesar
             # Usamos _start_download pasando la lista explícita y SIN preguntar calidad
-            self.app._start_download([filepath], ask_quality=False)
+            self.app._start_download([filepath], ask_quality=False)  # pylint: disable=protected-access
             console.print("\n[bold blue]👀 Resume watching...[/bold blue]")
         except Exception as e:
             console.print(f"[bold red]Error processing file:[/bold red] {e}")

@@ -29,7 +29,7 @@ class TestConfig:
         cfg = Config()
         assert cfg.OUTPUT_FOLDER_HQ == "Audio_HQ"
         assert cfg.OUTPUT_FOLDER_MOBILE == "Audio_Mobile"
-        assert cfg.MAX_WORKERS == 3
+        assert cfg.MAX_WORKERS == 4
         assert cfg.QUALITY_HQ_BITRATE == "320"
 
     def test_load_from_json(self):
@@ -49,7 +49,7 @@ class TestConfig:
     def test_load_missing_file(self):
         """Config.load() should return defaults if file missing"""
         cfg = Config.load("nonexistent.json")
-        assert cfg.MAX_WORKERS == 3  # Default value
+        assert cfg.MAX_WORKERS == 4  # Default value
 
 
 class TestTrackMetadata:

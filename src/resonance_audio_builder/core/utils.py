@@ -10,7 +10,7 @@ def calculate_md5(file_path: Path) -> str:
     hash_md5 = hashlib.md5(usedforsecurity=False)
     try:
         with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
+            for chunk in iter(lambda: f.read(131072), b""):  # 128KB chunks
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
     except Exception:
@@ -20,11 +20,11 @@ def calculate_md5(file_path: Path) -> str:
 def export_m3u(tracks: List[Tuple[str, str, int]], filepath: str):
     """Exporta lista de canciones a formato M3U"""
     try:
+        lines = ["#EXTM3U\n"]
+        for path, title, duration in tracks:
+            lines.append(f"#EXTINF:{duration},{title}\n{path}\n")
         with open(filepath, "w", encoding="utf-8") as f:
-            f.write("#EXTM3U\n")
-            for path, title, duration in tracks:
-                f.write(f"#EXTINF:{duration},{title}\n")
-                f.write(f"{path}\n")
+            f.write("".join(lines))
     except Exception:
         pass
 
@@ -38,7 +38,6 @@ def export_playlist_m3us(playlist_tracks_map: dict, output_folder: str):
         output_folder: Carpeta base (ej: Audio_HQ)
     """
     try:
-        import os
 
         for playlist_name, tracks in playlist_tracks_map.items():
             if not tracks:

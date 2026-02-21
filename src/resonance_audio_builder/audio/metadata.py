@@ -1,6 +1,9 @@
+"""Track metadata model and CSV parsing utilities."""
+
 import hashlib
 import re
 from dataclasses import dataclass, field
+from functools import partial
 from typing import List, Optional
 
 
@@ -33,6 +36,8 @@ def _get_int(r_norm: dict, *keys) -> int:
 
 @dataclass
 class TrackMetadata:
+    """Represents metadata for a single audio track."""
+
     track_id: str
     title: str
     artist: str
@@ -111,13 +116,13 @@ class TrackMetadata:
 
     @classmethod
     def from_csv_row(cls, row: dict) -> "TrackMetadata":
-        # Normalizar claves a minúsculas y quitar espacios
+        """Create a TrackMetadata instance from a CSV row dictionary."""
         r_norm = {k.strip().lower(): v for k, v in row.items()}
         r_orig = {k.strip(): v for k, v in row.items()}
 
-        gv = lambda *k: _get_value(r_norm, *k)  # noqa: E731
-        gf = lambda *k: _get_float(r_norm, *k)  # noqa: E731
-        gi = lambda *k: _get_int(r_norm, *k)  # noqa: E731
+        gv = partial(_get_value, r_norm)
+        gf = partial(_get_float, r_norm)
+        gi = partial(_get_int, r_norm)
 
         isrc = gv("isrc", "code")
         artist = gv("artist name(s)", "artist", "artist name")
@@ -167,10 +172,12 @@ class TrackMetadata:
 
     @property
     def duration_seconds(self) -> int:
+        """Duration in seconds, truncated."""
         return self.duration_ms // 1000 if self.duration_ms else 0
 
     @property
     def safe_filename(self) -> str:
+        """Generate a filesystem-safe filename from artist and title."""
         name = f"{self.artist} - {self.title}"
 
         # 1. Reemplazo inteligente de barras por guiones (AC/DC -> AC-DC)

@@ -4,6 +4,8 @@ import time
 
 
 class CacheManager:
+    """SQLite-backed key-value cache for search results."""
+
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.lock = threading.Lock()
@@ -15,8 +17,7 @@ class CacheManager:
                 # check_same_thread=False allows sharing connection across threads if locked
                 self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
                 self.cursor = self.conn.cursor()
-                self.cursor.execute(
-                    """
+                self.cursor.execute("""
                     CREATE TABLE IF NOT EXISTS cache (
                         key TEXT PRIMARY KEY,
                         url TEXT,
@@ -24,13 +25,13 @@ class CacheManager:
                         duration INTEGER,
                         timestamp REAL
                     )
-                """
-                )
+                """)
                 self.conn.commit()
             except Exception as e:
                 print(f"[!] Cache DB Init Error: {e}")
 
     def get(self, key: str, ttl_hours: int):
+        """Retrieve a cached entry by key if within TTL."""
         if not hasattr(self, "cursor"):
             return None
         limit_time = time.time() - (ttl_hours * 3600)
@@ -47,6 +48,7 @@ class CacheManager:
             return None
 
     def set(self, key: str, data: dict):
+        """Store or update a cache entry."""
         if not hasattr(self, "cursor"):
             return
         with self.lock:
@@ -63,10 +65,11 @@ class CacheManager:
                 pass
 
     def clear(self):
+        """Delete all entries from the cache."""
         if not hasattr(self, "cursor"):
             return
         # Use acquire with timeout to prevent deadlock
-        acquired = self.lock.acquire(timeout=5)
+        acquired = self.lock.acquire(timeout=5)  # pylint: disable=consider-using-with
         if not acquired:
             return
         try:
@@ -78,6 +81,7 @@ class CacheManager:
             self.lock.release()
 
     def count(self) -> int:
+        """Return the number of entries in the cache."""
         if not hasattr(self, "cursor"):
             return 0
         with self.lock:

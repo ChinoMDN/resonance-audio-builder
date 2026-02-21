@@ -69,20 +69,29 @@ Thumbs.db
 desktop.ini
 *.log
 
-# Test
+# Test & CI artifacts
 .pytest_cache/
 .coverage
 htmlcov/
+coverage-report/
+coverage.svg
 tests_v*.txt
 tests_pause.txt
 tests_run_flow.txt
 coverage_report_final_v*.txt
 final_coverage_report.txt
+junit.xml
+coverage.xml
+
+# Security reports
+security-reports/
 bandit-report.json
 safety-report.json
 pip-audit-report.txt
-junit.xml
-coverage.xml
+
+# Benchmarks
+benchmark-results/
+.benchmarks/
 
 # Build specs
 *.spec

@@ -1,4 +1,7 @@
+"""Spectral analysis for audio quality verification."""
+
 import os
+import re
 import subprocess
 import threading
 from pathlib import Path
@@ -7,6 +10,8 @@ from resonance_audio_builder.core.logger import Logger
 
 
 class AudioAnalyzer:
+    """Analyzes audio files for spectral integrity using FFmpeg."""
+
     def __init__(self, logger: Logger):
         self.log = logger
         self.lock = threading.Lock()
@@ -47,6 +52,7 @@ class AudioAnalyzer:
                 encoding="utf-8",
                 errors="replace",
                 creationflags=0x08000000 if os.name == "nt" else 0,
+                check=False,
             )
 
             # Parsear output buscando "Overall.RMS_level"
@@ -55,8 +61,6 @@ class AudioAnalyzer:
             # o valores como -90.5 dB
 
             output = result.stderr
-
-            import re
 
             # Buscamos la linea Overall.RMS_level=...
             # Ejemplo: [Parsed_astats_1 @ 000001bc5f5f4440] Overall.RMS_level=-70.231451
@@ -73,8 +77,7 @@ class AudioAnalyzer:
 
                 if level_db == float("-inf") or level_db < -75.0:
                     return False  # Fake HQ
-                else:
-                    return True  # Genuine HQ
+                return True  # Genuine HQ
 
             return True  # Si no podemos determinar, asumimos bueno para no alarmar ("Innocent until proven guilty")
 

@@ -85,3 +85,24 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+
+[tool.pylint.main]
+max-line-length = 120
+jobs = 1
+
+[tool.pylint."messages control"]
+disable = [
+    "import-error",           # E0401: deps not installed in CI lint env
+    "missing-module-docstring",  # C0114
+    "invalid-name",           # C0103: Config uses UPPER_CASE intentionally
+    "too-many-instance-attributes",  # R0902: data classes need many attrs
+    "too-few-public-methods",  # R0903: simple helper classes
+    "broad-exception-caught",  # W0718: intentional resilient error handling
+    "broad-exception-raised",  # W0719: same
+    "duplicate-code",         # R0801: similar embed_cover helpers
+    "import-outside-toplevel", # C0415: conditional/lazy imports are intentional
+    "global-statement",       # W0603: used in rate limiter
+    "too-many-arguments",     # R0913
+    "too-many-positional-arguments",  # R0917
+    "too-many-locals",        # R0914
+]

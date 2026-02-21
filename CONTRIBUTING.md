@@ -87,6 +87,9 @@ isort src/ tests/ --profile black --line-length 120
 
 # Run tests
 pytest tests/ -v
+
+# Run performance benchmarks
+pytest tests/benchmarks/ --benchmark-only -v
 ```
 
 ### General guidelines:
@@ -151,6 +154,14 @@ Before submitting a PR:
 ```bash
 pytest tests/ -v
 ```
+
+### Run performance benchmarks:
+
+```bash
+pytest tests/benchmarks/ --benchmark-only -v
+```
+
+If your change affects hot paths (CSV parsing, cover art, SQLite, file I/O), verify benchmarks don't regress.
 
 ### Manual testing:
 

@@ -55,21 +55,22 @@ Resonance focuses on **library quality and consistency**, providing:
 
 ## Features
 
-| Feature                    | Description                                                          |
-| -------------------------- | -------------------------------------------------------------------- |
-| **Rich UI**                | Professional terminal interface with live progress                   |
-| **Spectral Analysis**      | Detects fake HG audio (upscaled 128kbps)                             |
-| **Watchdog Mode**          | Auto-downloads when you drop CSVs into `Playlists/`                  |
-| **Enterprise CI/CD**       | **NEW!** Automated linting, security scanning, and builds            |
-| **Testing Suite**          | **NEW!** 200+ Unit, Integration, and Security tests (75.7% coverage) |
-| **Security Hardened**      | **NEW!** Protection against Path Traversal & Command Injection       |
-| **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources)        |
-| **Multi-profile Encoding** | Configurable high and low bitrate audio profiles                     |
-| **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume                    |
-| **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                             |
-| **Smart Matching**         | ISRC-based matching with text-search fallback                        |
-| **Resume Support**         | Checkpoint-based recovery for interrupted sessions                   |
-| **Organized Output**       | Auto-sorts lists into subfolders                                     |
+| Feature                    | Description                                                    |
+| -------------------------- | -------------------------------------------------------------- |
+| **Rich UI**                | Professional terminal interface with live progress             |
+| **Spectral Analysis**      | Detects fake HG audio (upscaled 128kbps)                       |
+| **Watchdog Mode**          | Auto-downloads when you drop CSVs into `Playlists/`            |
+| **Enterprise CI/CD**       | **NEW!** Automated linting, security scanning, and builds      |
+| **Testing Suite**          | 200+ Unit, Integration, and Security tests (75.7% coverage)    |
+| **Benchmark Suite**        | **NEW!** 31 performance benchmarks with regression tracking    |
+| **Security Hardened**      | **NEW!** Protection against Path Traversal & Command Injection |
+| **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources)  |
+| **Multi-profile Encoding** | Configurable high and low bitrate audio profiles               |
+| **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume              |
+| **Embedded Lyrics**        | Automatic lyrics retrieval and embedding                       |
+| **Smart Matching**         | ISRC-based matching with text-search fallback                  |
+| **Resume Support**         | Checkpoint-based recovery for interrupted sessions             |
+| **Organized Output**       | Auto-sorts lists into subfolders                               |
 
 ---
 
@@ -113,14 +114,25 @@ Choose between **High Quality (320kbps)**, **Mobile (96kbps)**, or **Both**. The
 
 ## Testing
 
-Version 8.4.1 features a comprehensive test suite (212 unit tests). To run the tests, install the development dependencies and use `pytest`:
+Version 8.5.0 features a comprehensive test suite (212 unit tests) and 31 performance benchmarks. To run the tests, install the development dependencies and use `pytest`:
 
 ```bash
 pip install -r requirements-dev.txt
 pytest tests/
+
+# Run performance benchmarks
+pytest tests/benchmarks/ --benchmark-only -v
 ```
 
 The suite covers Tier 1 (Unit), Tier 2 (Network), Tier 3 (Security), and Tier 4 (Integration), achieving over **75.7% statement coverage**.
+
+### Performance Estimates (100-track playlist, 4 workers)
+
+| Scenario                              | Time       |
+| ------------------------------------- | ---------- |
+| Best case (fast internet, cache hits) | ~5 min     |
+| Typical (decent connection)           | ~8–12 min  |
+| Worst case (slow CDN, retries)        | ~20–30 min |
 
 ## Configuration
 
@@ -132,7 +144,7 @@ Edit `config.json` to customize behavior:
     "output_folder_mobile": "Audio_Mobile",
     "quality_hq_bitrate": "320",
     "quality_mobile_bitrate": "96",
-    "max_workers": 3,
+    "max_workers": 4,
     "normalize_audio": true,
     "embed_lyrics": true,
     "output_format": "m4a"
@@ -147,7 +159,7 @@ Edit `config.json` to customize behavior:
 | `output_folder_mobile`   | `Audio_Mobile` | Folder for low-bitrate output                                |
 | `quality_hq_bitrate`     | `320`          | Bitrate for HQ profile                                       |
 | `quality_mobile_bitrate` | `96`           | Bitrate for mobile profile                                   |
-| `max_workers`            | `3`            | Concurrent processing threads                                |
+| `max_workers`            | `4`            | Concurrent async workers (safe up to 5 without proxies)      |
 | `normalize_audio`        | `true`         | Enable EBU R128 normalization                                |
 | `embed_lyrics`           | `true`         | Retrieve and embed lyrics                                    |
 | `output_format`          | `m4a`          | Output format: `m4a` (Recommended), `mp3`, `flac`, or `copy` |
@@ -227,12 +239,14 @@ resonance-audio-builder/
 │       └── __main__.py
 ├── Playlists/              # Input folder for CSVs (Auto-created)
 ├── tests/
+│   ├── benchmarks/        # Performance benchmark suite (31 tests)
+│   └── ...                # Unit, integration, and security tests
 ├── pyproject.toml
 ├── config.json
 ├── requirements.txt
-├── requirements-dev.txt     # New! Development and CI tools
-├── .pre-commit-config.yaml    # New! Local quality hooks
-├── run.py                    # Access point
+├── requirements-dev.txt    # Development and CI tools
+├── .pre-commit-config.yaml # Local quality hooks
+├── run.py                  # Access point
 └── README.md
 ```
 

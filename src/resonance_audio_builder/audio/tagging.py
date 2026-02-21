@@ -10,6 +10,8 @@ from resonance_audio_builder.core.logger import Logger
 
 
 class MetadataWriter:
+    """Writes M4A metadata tags using Mutagen."""
+
     def __init__(self, logger: Logger):
         self.log = logger
 
@@ -41,11 +43,11 @@ class MetadataWriter:
             return
 
         try:
-            credits = fetch_credits(meta.isrc)
-            if credits:
-                meta.composers = credits.get("composers", [])
-                meta.producers = credits.get("producers", [])
-                meta.engineers = credits.get("engineers", [])
+            mb_credits = fetch_credits(meta.isrc)
+            if mb_credits:
+                meta.composers = mb_credits.get("composers", [])
+                meta.producers = mb_credits.get("producers", [])
+                meta.engineers = mb_credits.get("engineers", [])
                 if meta.composers:
                     self.log.debug(f"Fetched MusicBrainz credits for {meta.title}")
         except Exception as e:

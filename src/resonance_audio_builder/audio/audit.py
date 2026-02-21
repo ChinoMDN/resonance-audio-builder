@@ -1,3 +1,5 @@
+"""Audio library audit tools for metadata and quality verification."""
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
@@ -10,6 +12,8 @@ from resonance_audio_builder.core.logger import Logger
 
 @dataclass
 class AuditResult:
+    """Aggregated results from an audio library audit."""
+
     total_files: int = 0
     total_size_bytes: int = 0
     missing_metadata: List[str] = field(default_factory=list)
@@ -20,6 +24,8 @@ class AuditResult:
 
 
 class AudioAuditor:
+    """Scans audio libraries for missing metadata and quality issues."""
+
     def __init__(self, logger: Logger, analyzer: AudioAnalyzer = None):
         self.log = logger
         self.analyzer = analyzer or AudioAnalyzer(logger)
@@ -27,6 +33,7 @@ class AudioAuditor:
     def scan_library(
         self, hq_path: Path, mobile_path: Path = None, check_spectral: bool = False
     ) -> Dict[str, AuditResult]:
+        """Scan HQ and optional Mobile library folders."""
         results = {}
 
         if hq_path.exists():

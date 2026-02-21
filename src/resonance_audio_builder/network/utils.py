@@ -12,7 +12,7 @@ USER_AGENTS = [
 
 def get_random_user_agent() -> str:
     """Retorna un User-Agent aleatorio de la lista"""
-    return random.choice(USER_AGENTS)
+    return random.choice(USER_AGENTS)  # nosec B311
 
 
 def is_valid_ip(ip: str) -> bool:

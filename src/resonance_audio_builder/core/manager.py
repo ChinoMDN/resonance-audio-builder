@@ -90,7 +90,7 @@ class DownloadManager:
         # Start Workers
         self.log.debug(f"starting {self.cfg.MAX_WORKERS} workers")
         workers = []
-        for i in range(self.cfg.MAX_WORKERS):
+        for _ in range(self.cfg.MAX_WORKERS):
             task = asyncio.create_task(self._worker())
             workers.append(task)
         self.log.debug("workers started")
@@ -224,10 +224,7 @@ class DownloadManager:
                 return False
             attempt += 1
 
-            try:
-                success, is_fatal, error = await self._attempt_download_iteration(track, task_id, attempt)
-            except Exception:
-                raise
+            success, is_fatal, error = await self._attempt_download_iteration(track, task_id, attempt)
 
             if success:
                 return True
@@ -261,7 +258,7 @@ class DownloadManager:
             result = await self.downloader.download(
                 search_result,
                 track,
-                lambda: self.keyboard.should_quit(),
+                self.keyboard.should_quit,
                 subfolder=subfolder,
             )
 
@@ -343,7 +340,7 @@ class DownloadManager:
         if self.cfg.SAVE_HISTORY:
             save_history(self.cfg.HISTORY_FILE, session_data)
 
-    def _generate_session_m3us(self, stats):
+    def _generate_session_m3us(self, stats):  # noqa: ARG002  # pylint: disable=unused-argument
         if not (self.cfg.GENERATE_M3U and self.all_tracks):
             return
         try:

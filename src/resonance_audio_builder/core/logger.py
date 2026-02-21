@@ -7,12 +7,15 @@ console = Console()
 
 
 class Logger:
+    """Thread-safe logger with Rich console and file output."""
+
     def __init__(self, debug: bool):
         self._debug = debug
         self._lock = threading.Lock()
         self._tracker = None
 
     def set_tracker(self, tracker):
+        """Set the UI tracker for live log display."""
         self._tracker = tracker
 
     def _log_to_file(self, msg_clean):
@@ -35,22 +38,27 @@ class Logger:
             console.print(f"[{style}]{msg}[/{style}]")
 
     def info(self, msg):
+        """Log an informational message."""
         with self._lock:
             self._log("info", f"[i] {msg}", "cyan")
 
     def debug(self, msg):
+        """Log a debug message if debug mode is enabled."""
         if self._debug:
             with self._lock:
                 self._log("debug", f"    [DEBUG] {msg}", "dim white")
 
     def error(self, msg):
+        """Log an error message."""
         with self._lock:
             self._log("error", f"[X] {msg}", "bold red")
 
     def success(self, msg):
+        """Log a success message."""
         with self._lock:
             self._log("success", f"[+] {msg}", "bold green")
 
     def warning(self, msg):
+        """Log a warning message."""
         with self._lock:
             self._log("warning", f"[!] {msg}", "bold yellow")

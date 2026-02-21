@@ -32,3 +32,12 @@ cookies.txt
 *.log
 *.csv
 !requirements.txt
+
+# CI artifacts
+benchmark-results/
+.benchmarks/
+coverage-report/
+security-reports/
+htmlcov/
+coverage.svg
+*.xml

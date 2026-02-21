@@ -151,8 +151,8 @@ def get_composer_string(isrc: str) -> Optional[str]:
     Convenience function that returns composers as a comma-separated string.
     Returns None if no composers found.
     """
-    credits = fetch_credits(isrc)
-    composers = credits.get("composers", [])
+    mb_credits = fetch_credits(isrc)
+    composers = mb_credits.get("composers", [])
 
     if composers:
         return ", ".join(composers)

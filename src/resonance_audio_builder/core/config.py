@@ -4,6 +4,8 @@ from dataclasses import dataclass
 
 
 class QualityMode:
+    """Constants for audio quality modes."""
+
     HQ_ONLY = "HQ"
     MOBILE_ONLY = "MOB"
     BOTH = "ALL"
@@ -11,6 +13,8 @@ class QualityMode:
 
 @dataclass
 class Config:
+    """Application configuration with JSON persistence."""
+
     OUTPUT_FOLDER_HQ: str = "Audio_HQ"
     OUTPUT_FOLDER_MOBILE: str = "Audio_Mobile"
     INPUT_FOLDER: str = "Playlists"
@@ -31,7 +35,7 @@ class Config:
     MODE: str = QualityMode.BOTH
 
     DEBUG_MODE: bool = False
-    MAX_WORKERS: int = 3
+    MAX_WORKERS: int = 4
     MAX_RETRIES: int = 3
     MAX_CACHE_SIZE: int = 5000
     DURATION_TOLERANCE: int = 15

@@ -30,12 +30,15 @@ class KeyboardController:
         self._running = False
 
     def is_paused(self) -> bool:
+        """Return True if the download is paused."""
         return not self.pause_event.is_set()
 
     def should_quit(self) -> bool:
+        """Return True if quit has been requested."""
         return self.quit_event.is_set()
 
     def should_skip(self) -> bool:
+        """Return True and clear skip flag if skip was requested."""
         if self.skip_event.is_set():
             self.skip_event.clear()
             return True

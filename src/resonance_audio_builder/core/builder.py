@@ -25,6 +25,8 @@ from resonance_audio_builder.network.utils import validate_cookies_file
 
 
 class App:
+    """Main application controller for Resonance Audio Builder."""
+
     def __init__(self):
         self.cfg = Config.load()  # Carga desde config.json si existe
         self.log = Logger(self.cfg.DEBUG_MODE)
@@ -412,7 +414,7 @@ class App:
             console.print(table)
 
             if res.fake_hq_detected:
-                with console.expander("Show Fake HQ Files"):
+                with console.expander("Show Fake HQ Files"):  # pylint: disable=no-member
                     for f in res.fake_hq_detected:
                         console.print(f" [red]![/red] {f}")
 
@@ -449,6 +451,7 @@ class App:
         start_observer(folder, self)
 
     def run(self):
+        """Main application loop with interactive menu."""
         # Chequear argumentos CLI manualmente (simple)
         import sys
 

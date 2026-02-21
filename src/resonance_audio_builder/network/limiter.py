@@ -32,6 +32,7 @@ class RateLimiter:
             self.current_delay = min(self.max_delay, self.current_delay * 1.5 * jitter)
 
     def get_delay(self) -> float:
+        """Return current delay value."""
         return self.current_delay
 
 
@@ -47,6 +48,7 @@ class CircuitBreaker:
         self.lock = threading.Lock()
 
     def record_failure(self):
+        """Record a failure and possibly open the circuit."""
         with self.lock:
             self.failures += 1
             self.last_failure_time = time.time()
@@ -54,6 +56,7 @@ class CircuitBreaker:
                 self.state = "OPEN"
 
     def record_success(self):
+        """Record a success and possibly close the circuit."""
         with self.lock:
             if self.state == "HALF_OPEN":
                 self.state = "CLOSED"
