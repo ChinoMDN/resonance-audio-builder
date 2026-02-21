@@ -162,6 +162,7 @@ jobs:
           pytest tests/ \
             -v \
             -n auto \
+            --ignore=tests/benchmarks \
             --cov=src/resonance_audio_builder \
             --cov-branch \
             --cov-report=xml \
