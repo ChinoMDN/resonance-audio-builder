@@ -234,8 +234,7 @@ Active Workers: {pending_count}
             if task_id in self.active_tasks:
                 del self.active_tasks[task_id]
 
-        # Don't remove from job_progress immediately to avoid issues?
-        # Actually it's cleaner to remove.
+        # Remove from job_progress to keep the UI state clean.
         try:
             self.job_progress.remove_task(task_id)
         except Exception:
@@ -243,8 +242,7 @@ Active Workers: {pending_count}
 
     def add_log(self, msg: str):
         """Append a log message to the live log buffer."""
-        # Called from Logger. Thread safe usually, but deque append is atomic.
-        # But log_text generation might flicker?
+        # Called from Logger. Update the log text buffer.
         self.log_buffer.append(msg)
         clean_text = "\n".join(list(self.log_buffer)[-8:])
         self.log_text.plain = clean_text

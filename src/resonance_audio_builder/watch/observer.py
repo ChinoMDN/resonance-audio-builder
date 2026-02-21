@@ -38,8 +38,7 @@ class PlaylistEventHandler(FileSystemEventHandler):
             if filepath in self.timers:
                 self.timers[filepath].cancel()
 
-            # Show "Detecting..." log only once or sporadically?
-            # Better keep it quiet until processing to avoid spamming terminal on every byte written
+            # Skip logging "Detecting" on every event to avoid terminal spam during writes.
 
             timer = threading.Timer(self.delay, self._process_debounced, [filepath])
             self.timers[filepath] = timer

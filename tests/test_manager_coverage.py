@@ -57,5 +57,6 @@ def test_save_failed_exception_handling(manager):
     manager.failed_tracks.append((track, "Some Error"))
 
     with patch("builtins.open", side_effect=PermissionError("Boom")):
-        # Should not raise
+        manager.log = MagicMock()
         manager._save_failed()
+        manager.log.error.assert_called()

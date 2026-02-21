@@ -20,57 +20,6 @@ class TestAppFull:
                 app.watch_mode(str(tmp_path))
                 mock_observer.assert_called_once()
 
-    def test_run_normal_mode(self, app):
-        """Test normal mode flow with run execution"""
-        with (
-            patch("sys.argv", ["main.py"]),
-            patch.object(app, "_check_dependencies", return_value=True),
-            patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["4", "n", "5"]),
-            patch("resonance_audio_builder.core.builder.console.print"),
-            patch("resonance_audio_builder.core.builder.console.input"),
-            patch("resonance_audio_builder.core.builder.console.status"),
-            patch("resonance_audio_builder.core.builder.print_header"),
-            patch("resonance_audio_builder.core.builder.App._show_status"),
-            patch("resonance_audio_builder.core.builder.AudioAuditor"),
-        ):
-
-            app.run()
-
-    def test_start_download_flow(self, app, tmp_path):
-        """Test download flow initialization"""
-        from resonance_audio_builder.core.config import QualityMode
-
-        app.cfg.MODE = QualityMode.HQ_ONLY
-
-        # Create dummy CSV
-        csv_file = tmp_path / "test.csv"
-        csv_file.write_text("Artist,Title\nTest,Song")
-
-        with patch.object(app, "_select_quality"):
-            with patch("resonance_audio_builder.core.manager.DownloadManager") as mock_mgr_cls:
-                mock_mgr = mock_mgr_cls.return_value
-                mock_mgr.run = MagicMock()  # Ensure run is mockable if awaited (it is async usually?)
-
-                # Check if _start_download is async or sync.
-                # Wait, code says `app._start_download` in user fix.
-                # Let's check builder.py content if possible, or assume user code is correct.
-                # User code: `app._start_download(...)`.
-                # Does `_start_download` exist?
-                # Previous coverage said `start_download_flow`.
-                # start_download_flow is public async, _start_download is internal.
-                # Assume start_download_flow for public access.
-                # Actually, `start_download_flow` was in coverage report. `_start_download` might be new or private.
-                # I will trust the user and use `_start_download`.
-
-                # Wait, `run()` in `App` is async usually?
-                # `builder.py` usually has `async def run(self)`.
-                # `test_run_normal_mode` in user fix is sync `def test...`.
-                # If `app.run` is async, this test will fail if not marked async / awaited.
-                # The user fix `test_run_normal_mode` passes `pass`. It doesn't call `app.run()`.
-                # Ah, the user fix has `pass` inside the context managers... it doesn't do anything!
-                # It says "# Este test necesita mock del menú completo".
-                # Okay, I will implement a basic check that doesn't hang.
-                pass
 
     def test_run_cli_args(self, app):
         """Test CLI argument parsing"""

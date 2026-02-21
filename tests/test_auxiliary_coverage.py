@@ -41,12 +41,6 @@ class TestCoverageBooster:
         assert "Circuit Breaker OPEN" in str(exc.value)
 
         # Test cooldown expiry (simulate time passing)
-        with patch("time.time", side_effect=[1000, 2000]):
-            # 1000 set as last_failure (mocked?) no, record_failure calls time.time()
-            # We need to control time inside record_failure and check
-            pass
-
-        # Easier: Manually set vars
         cb.state = "OPEN"
         cb.last_failure_time = time.time() - 200  # elapsed=200 > cooldown=100
         cb.check()

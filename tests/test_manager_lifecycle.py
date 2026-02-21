@@ -47,18 +47,19 @@ class TestManagerLifecycle:
         # Ponemos una tarea que hará crash
         await manager.queue.put("POISON_PILL")  # Un string en vez de TrackMetadata causará error
 
-        # Mockeamos el logger para verificar que registró el error
-        manager.logger = MagicMock()
+        # Mock logger
+        manager.log = MagicMock()
 
-        # Ejecutamos un ciclo manual del worker (simulado)
+        # Run worker loop logic for one iteration
         with patch.object(manager, "_process_track_attempts", side_effect=Exception("Unexpected Crash")):
-            # Ejecutamos lógica del worker protegida
+            # We call the loop once or simulate its body
             try:
-                # Simulamos sacar de la cola y procesar
-                track = manager.queue.get_nowait()
-                await manager._process_track_attempts(track, "worker_1")
+                await manager._worker()
             except Exception:
-                pass  # El worker real capturaría esto
+                pass
+
+        # Verify logger caught the error from the loop
+        manager.log.error.assert_called_with("Worker loop error: Unexpected Crash")
 
     @pytest.mark.asyncio
     async def test_real_worker_execution(self, manager):

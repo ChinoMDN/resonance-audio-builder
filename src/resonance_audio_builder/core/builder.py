@@ -93,7 +93,7 @@ class App:
         inp_dir = Path(self.cfg.INPUT_FOLDER)
         inp_dir.mkdir(exist_ok=True)
 
-        # Glob uses OS separators logic? glob.glob accepts paths.
+        # Search for CSV files in the input folder
         pattern = str(inp_dir / "*.csv")
         csvs = [c for c in glob.glob(pattern) if "fallidas" not in c.lower()]
 
@@ -371,8 +371,7 @@ class App:
 
         with console.status("[bold cyan]Scanning library...") as _:
             auditor = AudioAuditor(self.log)
-            # Check spectral only if specifically requested or for small libraries?
-            # For now, let's ask or just do it if not too many files.
+            # Decide whether to perform spectral analysis (slow)
 
             hq_path = Path(self.cfg.OUTPUT_FOLDER_HQ)
             mob_path = Path(self.cfg.OUTPUT_FOLDER_MOBILE)

@@ -54,33 +54,6 @@ class AudioDownloader:
         self.analyzer = AudioAnalyzer(logger)
         self.proxy_manager = proxy_manager
         self._cover_cache: dict[str, Optional[bytes]] = {}
-        # Note: Searcher is passed or instantiated outside usually, but manager keeps it.
-        # If downloader needs to search, it should take searcher as dependency or arg,
-        # but here we pass search_result directly to download().
-        # However, old code had self.searcher call inside download()!
-        # Wait, previous code had `self.searcher.search(track)` inside `download`.
-        # This is bad dependency injection. The Manager handles search typically,
-        # OR the downloader does it. In previous `downloader.py` (Step 509),
-        # line 83: `search_result = self.searcher.search(track)`.
-        # This implies `self.searcher` was attached to downloader instance?
-        # No, wait. Line 83 `search_result = self.searcher.search(track)` fails if `self.searcher` undefined.
-        # Let's check `manager.py`. It does: `self.downloader = AudioDownloader(...)`.
-        # It does NOT assign searcher to downloader.
-        # WAIT. In Step 504 file viewing, line 83 calls `self.searcher`.
-        # BUT line 42 `def download(self, search_result: SearchResult, track: TrackMetadata...`
-        # It TAKES `search_result` as ARGUMENT.
-        # BUT line 83 overwrites it: `search_result = self.searcher.search(track)`?
-        # Why would it search again if passed as argument?
-        # Ah, looking at Step 509...
-        # `def download(self, search_result: SearchResult, track: TrackMetadata...`
-        # Then inside:
-        # `search_result = self.searcher.search(track)`
-        # This is weird. Probably my previous edit or the original code was confused.
-        # If `search_result` is passed, we shouldn't search again.
-        # Ideally, Manager does Search -> Result -> Downloader.
-        # I will FIX this design flaw here. `download()` will take `search_result` and USE it.
-        # If `search_result` is None, it might fail or we fix it to allow internal search if searcher is provided.
-        # I'll stick to: Manager provides the SearchResult.
 
     async def validate_audio_file(self, path: Path) -> bool:
         """Valida integridad del archivo de audio usando FFmpeg (Async)"""
