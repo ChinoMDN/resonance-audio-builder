@@ -79,7 +79,12 @@ class MetadataWriter:
         audio.save()
 
     def _write_m4a_basic_tags(self, audio, meta: TrackMetadata):
-        # --- 1. Textos Básicos ---
+        self._write_m4a_text_tags(audio, meta)
+        self._write_m4a_copyright_tags(audio, meta)
+        self._write_m4a_tool_tags(audio, meta)
+
+    def _write_m4a_text_tags(self, audio, meta: TrackMetadata):
+        """Write core text tags: title, artist, album, date, genre."""
         if meta.title:
             audio["\xa9nam"] = meta.title
         if meta.artists:
@@ -94,20 +99,21 @@ class MetadataWriter:
             main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[0]
             audio["\xa9gen"] = main_genre
 
-        # Copyrights (Prioridad: Copyrights field > Label)
+    def _write_m4a_copyright_tags(self, audio, meta: TrackMetadata):
+        """Write copyright and publisher tags."""
         if meta.copyrights:
             audio["cprt"] = meta.copyrights
         elif meta.label:
             audio["cprt"] = meta.label
 
-        # Publisher / Label
         if meta.label:
             try:
                 audio["\xa9pub"] = meta.label
             except Exception:
                 pass
 
-        # Encoded By
+    def _write_m4a_tool_tags(self, audio, meta: TrackMetadata):
+        """Write encoder, comment, and tempo tags."""
         audio["\xa9too"] = "Resonance Audio Builder"
         try:
             audio["\xa9enc"] = "Resonance Audio Builder"

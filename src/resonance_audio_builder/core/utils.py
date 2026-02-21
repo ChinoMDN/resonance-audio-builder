@@ -29,15 +29,13 @@ def export_m3u(tracks: List[Tuple[str, str, int]], filepath: str):
         pass
 
 
-def export_playlist_m3us(playlist_tracks_map: dict, output_folder: str, playlists_base_folder: str = None):
+def export_playlist_m3us(playlist_tracks_map: dict, output_folder: str):
     """
-    Exporta archivos M3U individuales para cada playlist.
-    El M3U se guarda junto con los archivos de la playlist.
+    Exporta archivos M3U individuales para cada playlist en la carpeta raíz de salida.
 
     Args:
         playlist_tracks_map: Dict mapping playlist_name -> List[TrackMetadata]
-        output_folder: Carpeta base donde están las subcarpetas de las playlists
-        playlists_base_folder: No usado (mantenido por compatibilidad)
+        output_folder: Carpeta base (ej: Audio_HQ)
     """
     try:
         import os
@@ -46,29 +44,27 @@ def export_playlist_m3us(playlist_tracks_map: dict, output_folder: str, playlist
             if not tracks:
                 continue
 
-            # El M3U va junto con la carpeta de la playlist
-            playlist_folder = os.path.join(output_folder, playlist_name)
-            os.makedirs(playlist_folder, exist_ok=True)
-
-            # Create M3U8 file inside the playlist folder (M3U8 = UTF-8 standard)
-            m3u_path = os.path.join(playlist_folder, f"{playlist_name}.m3u8")
+            # El M3U se guarda en la raíz de la carpeta de salida (Audio_HQ/Playlist.m3u8)
+            os.makedirs(output_folder, exist_ok=True)
+            m3u_path = os.path.join(output_folder, f"{playlist_name}.m3u8")
             m3u_tracks = []
 
             for track in tracks:
-                # Look for the downloaded file - it may be in any playlist subfolder
+                # Subcarpeta de descarga real (donde vive el archivo)
                 subfolder = getattr(track, "playlist_subfolder", playlist_name)
-                track_folder = os.path.join(output_folder, subfolder)
+                track_rel_folder = subfolder
 
-                # Try to find the file
+                # Nombre del archivo esperado
                 filename = f"{track.safe_filename}.m4a"
-                file_path = os.path.join(track_folder, filename)
+                rel_file_path = os.path.join(track_rel_folder, filename).replace(os.sep, "/")
 
-                if os.path.exists(file_path):
-                    # Use relative path from M3U location (the playlist folder)
-                    rel_path = os.path.relpath(file_path, playlist_folder)
-                    title = f"{track.artist} - {track.title}"
-                    duration = track.duration_seconds
-                    m3u_tracks.append((rel_path, title, duration))
+                # Información para el M3U
+                title = f"{track.artist} - {track.title}"
+                duration = track.duration_seconds
+
+                # Agregamos la entrada independientemente de si existe en disco
+                # para que el M3U refleje el CSV completo.
+                m3u_tracks.append((rel_file_path, title, duration))
 
             if m3u_tracks:
                 export_m3u(m3u_tracks, m3u_path)

@@ -327,27 +327,26 @@ class AudioDownloader:
             audio["tmpo"] = [int(round(track.tempo))]
 
     def _apply_m4a_extra_tags(self, audio: MP4, track: TrackMetadata):
-        # Track number (tuple format: track, total)
-        if track.track_number:
-            try:
-                tn = int(track.track_number)
-                audio["trkn"] = [(tn, 0)]
-            except ValueError:
-                pass
+        self._apply_m4a_number_tag(audio, "trkn", track.track_number)
+        self._apply_m4a_number_tag(audio, "disk", track.disc_number)
 
-        # Disc number
-        if track.disc_number:
-            try:
-                dn = int(track.disc_number)
-                audio["disk"] = [(dn, 0)]
-            except ValueError:
-                pass
-
-        # Cover art - M4A requires format specification
         if track.cover_data:
             self._embed_cover_m4a(audio, track.cover_data)
 
-        # Lyrics
+        self._apply_m4a_lyrics(audio, track)
+        self._apply_m4a_composer(audio, track)
+
+    def _apply_m4a_number_tag(self, audio: MP4, key: str, value: str):
+        """Set a numeric tuple tag (track/disc number) on an M4A file."""
+        if not value:
+            return
+        try:
+            audio[key] = [(int(value), 0)]
+        except ValueError:
+            pass
+
+    def _apply_m4a_lyrics(self, audio: MP4, track: TrackMetadata):
+        """Fetch and embed lyrics into an M4A file."""
         try:
             lyrics = fetch_lyrics(track.artist, track.title, track.duration_seconds)
             if lyrics:
@@ -356,13 +355,15 @@ class AudioDownloader:
         except Exception as e:
             self.log.debug(f"Error obteniendo letras: {e}")
 
-        # Composer from MusicBrainz
+    def _apply_m4a_composer(self, audio: MP4, track: TrackMetadata):
+        """Fetch and embed composer info from MusicBrainz."""
+        if not track.isrc:
+            return
         try:
-            if track.isrc:
-                composer = get_composer_string(track.isrc)
-                if composer:
-                    audio["\xa9wrt"] = [composer]
-                    self.log.debug(f"Compositor: {composer}")
+            composer = get_composer_string(track.isrc)
+            if composer:
+                audio["\xa9wrt"] = [composer]
+                self.log.debug(f"Compositor: {composer}")
         except Exception as e:
             self.log.debug(f"Error obteniendo compositor: {e}")
 

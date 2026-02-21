@@ -20,27 +20,25 @@ def test_export_playlist_m3us_success(tmp_path, mock_track):
     output_folder = tmp_path / "Audio_HQ"
     playlist_name = "MyPlaylist"
 
-    # Create structure
-    (output_folder / playlist_name).mkdir(parents=True)
-
-    # Create fake file
-    fake_file = output_folder / playlist_name / "Track - Artist.m4a"
-    fake_file.touch()
+    # Create base
+    output_folder.mkdir(parents=True)
 
     tracks_map = {playlist_name: [mock_track]}
 
     export_playlist_m3us(tracks_map, str(output_folder))
 
-    m3u_file = output_folder / playlist_name / f"{playlist_name}.m3u8"
+    # M3U8 should be in the ROOT of output_folder
+    m3u_file = output_folder / f"{playlist_name}.m3u8"
     assert m3u_file.exists()
 
     content = m3u_file.read_text(encoding="utf-8")
     assert "#EXTM3U" in content
-    assert "Track - Artist.m4a" in content
+    # Should contain path with forward slash
+    assert "MyPlaylist/Track - Artist.m4a" in content
 
 
-def test_export_playlist_m3us_missing_file(tmp_path, mock_track):
-    # File does not exist, should not appear in m3u
+def test_export_playlist_m3us_includes_missing_file(tmp_path, mock_track):
+    # Even if file does not exist, it should appear in m3u now
     output_folder = tmp_path / "Audio_HQ"
     playlist_name = "MyPlaylist"
 
@@ -48,11 +46,10 @@ def test_export_playlist_m3us_missing_file(tmp_path, mock_track):
 
     export_playlist_m3us(tracks_map, str(output_folder))
 
-    m3u_file = output_folder / playlist_name / f"{playlist_name}.m3u8"
-    # It might create an empty file or nothing. The code says:
-    # if m3u_tracks: export_m3u(...)
-    # So if no tracks found, no file created?
-    assert not m3u_file.exists()
+    m3u_file = output_folder / f"{playlist_name}.m3u8"
+    assert m3u_file.exists()
+    content = m3u_file.read_text(encoding="utf-8")
+    assert "MyPlaylist/Track - Artist.m4a" in content
 
 
 def test_export_playlist_m3us_empty_map(tmp_path):

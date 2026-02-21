@@ -344,7 +344,7 @@ class DownloadManager:
             save_history(self.cfg.HISTORY_FILE, session_data)
 
     def _generate_session_m3us(self, stats):
-        if self.cfg.GENERATE_M3U and stats.get("ok", 0) > 0:
+        if self.cfg.GENERATE_M3U and self.all_tracks:
             try:
                 from resonance_audio_builder.core.utils import export_playlist_m3us
 
@@ -363,18 +363,20 @@ class DownloadManager:
                             playlist_tracks_map[playlist_name] = []
                         playlist_tracks_map[playlist_name].append(track)
 
-                # Determine output folder
-                folder = (
-                    self.cfg.OUTPUT_FOLDER_HQ
-                    if self.cfg.MODE != QualityMode.MOBILE_ONLY
-                    else self.cfg.OUTPUT_FOLDER_MOBILE
-                )
-
-                # Generate individual M3U files (saved inside each playlist folder)
-                export_playlist_m3us(playlist_tracks_map, folder)
+                # Generate individual M3U files (saved in the base output folder)
+                if self.cfg.MODE == QualityMode.BOTH:
+                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_HQ)
+                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_MOBILE)
+                elif self.cfg.MODE == QualityMode.MOBILE_ONLY:
+                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_MOBILE)
+                else:
+                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_HQ)
 
                 if playlist_tracks_map:
-                    print(f"  [i] {len(playlist_tracks_map)} playlist M3U files created")
+                    msg = f"  [i] {len(playlist_tracks_map)} playlist M3U files created"
+                    if self.cfg.MODE == QualityMode.BOTH:
+                        msg += " (both HQ and Mobile)"
+                    print(msg)
             except Exception as e:
                 self.log.debug(f"M3U generation error: {e}")
                 pass

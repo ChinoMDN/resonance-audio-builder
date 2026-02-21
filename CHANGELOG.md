@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format follows **[Keep a Changelog](https://keepachangelog.com/en/1.0.0/)**
 This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)**.
 
+## [8.4.1] – 2026-02-07
+
+### Changed
+
+- **Playlist Relocation**: Moved `.m3u8` files to the root of `Audio_HQ` and `Audio_Mobile` folders for easier access.
+- **Playlist Integrity**: Updated generation to include all tracks from CSVs, ensuring offline playlists are accurate, and standardized on forward slashes for cross-platform compatibility.
+
 ## [8.3.0] – 2026-02-07
 
 ### Changed

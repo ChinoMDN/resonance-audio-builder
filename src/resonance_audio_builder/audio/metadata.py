@@ -4,6 +4,33 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 
+def _get_value(r_norm: dict, *keys) -> str:
+    """Look up a value from a normalized dict by trying multiple keys."""
+    for k in keys:
+        val = r_norm.get(k.lower())
+        if val is not None:
+            return val.strip()
+    return ""
+
+
+def _get_float(r_norm: dict, *keys) -> float:
+    """Look up a float value from a normalized dict."""
+    try:
+        val = _get_value(r_norm, *keys)
+        return float(val) if val else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _get_int(r_norm: dict, *keys) -> int:
+    """Look up an int value from a normalized dict."""
+    try:
+        val = _get_value(r_norm, *keys)
+        return int(float(val)) if val else 0
+    except ValueError:
+        return 0
+
+
 @dataclass
 class TrackMetadata:
     track_id: str
@@ -88,30 +115,13 @@ class TrackMetadata:
         r_norm = {k.strip().lower(): v for k, v in row.items()}
         r_orig = {k.strip(): v for k, v in row.items()}
 
-        def get_v(*keys):
-            for k in keys:
-                val = r_norm.get(k.lower())
-                if val is not None:
-                    return val.strip()
-            return ""
+        gv = lambda *k: _get_value(r_norm, *k)  # noqa: E731
+        gf = lambda *k: _get_float(r_norm, *k)  # noqa: E731
+        gi = lambda *k: _get_int(r_norm, *k)  # noqa: E731
 
-        def get_f(*keys):
-            try:
-                val = get_v(*keys)
-                return float(val) if val else 0.0
-            except ValueError:
-                return 0.0
-
-        def get_i(*keys):
-            try:
-                val = get_v(*keys)
-                return int(float(val)) if val else 0
-            except ValueError:
-                return 0
-
-        isrc = get_v("isrc", "code")
-        artist = get_v("artist name(s)", "artist", "artist name")
-        title = get_v("track name", "track", "title", "name")
+        isrc = gv("isrc", "code")
+        artist = gv("artist name(s)", "artist", "artist name")
+        title = gv("track name", "track", "title", "name")
 
         if isrc:
             tid = f"isrc_{isrc}"
@@ -123,36 +133,36 @@ class TrackMetadata:
             artist=artist,
             title=title,
             isrc=isrc,
-            album=get_v("album name", "album"),
-            album_artist=get_v("album artist name(s)", "album artist"),
-            release_date=get_v("album release date", "release date", "date", "year"),
-            track_number=get_v("track number", "track no"),
-            disc_number=get_v("disc number", "disc no"),
-            duration_ms=get_i("track duration (ms)", "duration ms", "duration", "ms"),
-            spotify_uri=get_v("track uri", "spotify uri", "uri"),
-            cover_url=get_v("album image url", "image url", "cover"),
+            album=gv("album name", "album"),
+            album_artist=gv("album artist name(s)", "album artist"),
+            release_date=gv("album release date", "release date", "date", "year"),
+            track_number=gv("track number", "track no"),
+            disc_number=gv("disc number", "disc no"),
+            duration_ms=gi("track duration (ms)", "duration ms", "duration", "ms"),
+            spotify_uri=gv("track uri", "spotify uri", "uri"),
+            cover_url=gv("album image url", "image url", "cover"),
             raw_data=r_orig,
-            popularity=get_i("popularity"),
-            explicit=get_v("explicit").lower() in ("true", "1", "yes"),
-            genres=get_v("artist genres", "genres", "genre"),
-            album_genres=get_v("album genres"),
-            label=get_v("label", "publisher"),
-            copyrights=get_v("copyrights", "copyright"),
-            preview_url=get_v("track preview url", "preview url"),
-            added_by=get_v("added by"),
-            added_at=get_v("added at"),
-            tempo=get_f("tempo", "bpm"),
-            energy=get_f("energy"),
-            danceability=get_f("danceability"),
-            valence=get_f("valence"),
-            acousticness=get_f("acousticness"),
-            instrumentalness=get_f("instrumentalness"),
-            liveness=get_f("liveness"),
-            speechiness=get_f("speechiness"),
-            loudness=get_f("loudness"),
-            key=get_i("key"),
-            mode=get_i("mode"),
-            time_signature=get_i("time signature", "time_signature") or 4,
+            popularity=gi("popularity"),
+            explicit=gv("explicit").lower() in ("true", "1", "yes"),
+            genres=gv("artist genres", "genres", "genre"),
+            album_genres=gv("album genres"),
+            label=gv("label", "publisher"),
+            copyrights=gv("copyrights", "copyright"),
+            preview_url=gv("track preview url", "preview url"),
+            added_by=gv("added by"),
+            added_at=gv("added at"),
+            tempo=gf("tempo", "bpm"),
+            energy=gf("energy"),
+            danceability=gf("danceability"),
+            valence=gf("valence"),
+            acousticness=gf("acousticness"),
+            instrumentalness=gf("instrumentalness"),
+            liveness=gf("liveness"),
+            speechiness=gf("speechiness"),
+            loudness=gf("loudness"),
+            key=gi("key"),
+            mode=gi("mode"),
+            time_signature=gi("time signature", "time_signature") or 4,
         )
 
     @property
