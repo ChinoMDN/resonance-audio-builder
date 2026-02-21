@@ -344,39 +344,48 @@ class DownloadManager:
             save_history(self.cfg.HISTORY_FILE, session_data)
 
     def _generate_session_m3us(self, stats):
-        if self.cfg.GENERATE_M3U and self.all_tracks:
-            try:
-                from resonance_audio_builder.core.utils import export_playlist_m3us
+        if not (self.cfg.GENERATE_M3U and self.all_tracks):
+            return
+        try:
+            from resonance_audio_builder.core.utils import export_playlist_m3us
 
-                # Build a mapping of playlist_name -> [tracks]
-                playlist_tracks_map = {}
-                for track in self.all_tracks:
-                    playlists = getattr(track, "playlists", [])
-                    if not playlists:
-                        # Fallback to subfolder if playlists not set
-                        subfolder = getattr(track, "playlist_subfolder", None)
-                        if subfolder:
-                            playlists = [subfolder]
+            playlist_tracks_map = self._build_playlist_map()
+            self._export_m3us_for_mode(export_playlist_m3us, playlist_tracks_map)
+            self._log_m3u_result(playlist_tracks_map)
+        except Exception as e:
+            self.log.debug(f"M3U generation error: {e}")
 
-                    for playlist_name in playlists:
-                        if playlist_name not in playlist_tracks_map:
-                            playlist_tracks_map[playlist_name] = []
-                        playlist_tracks_map[playlist_name].append(track)
+    def _build_playlist_map(self) -> dict:
+        """Build a mapping of playlist_name -> [tracks]."""
+        playlist_tracks_map: dict = {}
+        for track in self.all_tracks:
+            playlists = getattr(track, "playlists", [])
+            if not playlists:
+                subfolder = getattr(track, "playlist_subfolder", None)
+                if subfolder:
+                    playlists = [subfolder]
 
-                # Generate individual M3U files (saved in the base output folder)
-                if self.cfg.MODE == QualityMode.BOTH:
-                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_HQ)
-                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_MOBILE)
-                elif self.cfg.MODE == QualityMode.MOBILE_ONLY:
-                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_MOBILE)
-                else:
-                    export_playlist_m3us(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_HQ)
+            for playlist_name in playlists:
+                if playlist_name not in playlist_tracks_map:
+                    playlist_tracks_map[playlist_name] = []
+                playlist_tracks_map[playlist_name].append(track)
+        return playlist_tracks_map
 
-                if playlist_tracks_map:
-                    msg = f"  [i] {len(playlist_tracks_map)} playlist M3U files created"
-                    if self.cfg.MODE == QualityMode.BOTH:
-                        msg += " (both HQ and Mobile)"
-                    print(msg)
-            except Exception as e:
-                self.log.debug(f"M3U generation error: {e}")
-                pass
+    def _export_m3us_for_mode(self, export_fn, playlist_tracks_map):
+        """Call export function for the appropriate output folders based on quality mode."""
+        if self.cfg.MODE == QualityMode.BOTH:
+            export_fn(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_HQ)
+            export_fn(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_MOBILE)
+        elif self.cfg.MODE == QualityMode.MOBILE_ONLY:
+            export_fn(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_MOBILE)
+        else:
+            export_fn(playlist_tracks_map, self.cfg.OUTPUT_FOLDER_HQ)
+
+    def _log_m3u_result(self, playlist_tracks_map):
+        """Print summary of generated M3U files."""
+        if not playlist_tracks_map:
+            return
+        msg = f"  [i] {len(playlist_tracks_map)} playlist M3U files created"
+        if self.cfg.MODE == QualityMode.BOTH:
+            msg += " (both HQ and Mobile)"
+        print(msg)
