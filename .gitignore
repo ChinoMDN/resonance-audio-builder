@@ -82,6 +82,8 @@ coverage_report_final_v*.txt
 final_coverage_report.txt
 junit.xml
 coverage.xml
+coverage.json
+progress.db*
 
 # Security reports
 security-reports/
