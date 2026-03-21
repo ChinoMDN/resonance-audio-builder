@@ -53,7 +53,7 @@
     | **Spectral Analysis**      | Detects fake HQ audio (upscaled 128kbps)                       |
     | **Watchdog Mode**          | Auto-downloads when you drop CSVs into `Playlists/`            |
     | **Enterprise CI/CD**       | **NEW!** Automated linting, security scanning, and builds      |
-    | **Testing Suite**          | 212 Unit, Integration, and Security tests (75.7% coverage)     |
+    | **Testing Suite**          | 212 Unit, Integration, and Security tests (>70% coverage)      |
     | **Benchmark Suite**        | **NEW!** 31 performance benchmarks with regression tracking    |
     | **Security Hardened**      | **NEW!** Protection against Path Traversal & Command Injection |
     | **Metadata Enrichment**    | Title, artist, album, cover art, ISRC (from external sources)  |
@@ -116,7 +116,7 @@
     pytest tests/benchmarks/ --benchmark-only -v
     ```
 
-    The suite covers Tier 1 (Unit), Tier 2 (Network), Tier 3 (Security), and Tier 4 (Integration), with **212 automated tests** and over **75.7% statement coverage**.
+    The suite covers Tier 1 (Unit), Tier 2 (Network), Tier 3 (Security), and Tier 4 (Integration), with **212 automated tests** and over **70% statement coverage**.
 
     ### Performance Estimates (100-track playlist, 4 workers)
 

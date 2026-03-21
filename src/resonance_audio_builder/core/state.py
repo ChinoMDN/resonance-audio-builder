@@ -36,7 +36,8 @@ class ProgressDB:
     def _init_db(self):
         """Inicializa esquema de la base de datos"""
         with self.lock:
-            self._conn.execute("""
+            self._conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS downloads (
                     track_id TEXT PRIMARY KEY,
                     artist TEXT,
@@ -47,9 +48,11 @@ class ProgressDB:
                     timestamp REAL,
                     retry_count INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
-            self._conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)")
+            self._conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)")
             self._conn.commit()
 
     def mark(self, track: TrackMetadata, status: str, bytes_n: int = 0, error: Optional[str] = None):
@@ -67,7 +70,8 @@ class ProgressDB:
                         timestamp = excluded.timestamp,
                         retry_count = retry_count + 1
                 """,
-                    (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()),
+                    (track.track_id, track.artist, track.title,
+                     status, bytes_n, error, time.time()),
                 )
             else:
                 self._conn.execute(
@@ -80,7 +84,8 @@ class ProgressDB:
                         error = NULL,
                         timestamp = excluded.timestamp
                 """,
-                    (track.track_id, track.artist, track.title, status, bytes_n, error, time.time()),
+                    (track.track_id, track.artist, track.title,
+                     status, bytes_n, error, time.time()),
                 )
 
             self._conn.commit()
@@ -88,14 +93,16 @@ class ProgressDB:
     def is_done(self, track_id: str) -> bool:
         """Verifica si una descarga está completada exitosamente"""
         with self.lock:
-            cursor = self._conn.execute("SELECT 1 FROM downloads WHERE track_id = ? AND status = 'ok'", (track_id,))
+            cursor = self._conn.execute(
+                "SELECT 1 FROM downloads WHERE track_id = ? AND status = 'ok'", (track_id,))
             return cursor.fetchone() is not None
 
     def get_stats(self) -> Dict[str, int]:
         """Retorna estadísticas de la sesión/base de datos"""
         stats = {"ok": 0, "skip": 0, "error": 0, "bytes": 0}
         with self.lock:
-            cursor = self._conn.execute("SELECT status, COUNT(*), SUM(bytes) FROM downloads GROUP BY status")
+            cursor = self._conn.execute(
+                "SELECT status, COUNT(*), SUM(bytes) FROM downloads GROUP BY status")
             for row in cursor:
                 status = row[0]
                 count = row[1]
@@ -120,7 +127,8 @@ class ProgressDB:
 
             for row in cursor:
                 # Reconstruir métadatos mínimos para reintento
-                track = TrackMetadata(track_id=row[2], artist=row[0], title=row[1])
+                track = TrackMetadata(
+                    track_id=row[2], artist=row[0], title=row[1])
                 tracks.append(track)
         return tracks
 
