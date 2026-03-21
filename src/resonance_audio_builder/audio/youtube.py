@@ -82,16 +82,32 @@ class YouTubeSearcher:
         except Exception:
             pass
 
+    def _get_from_cache(self, cache_key: str, ttl_hours: int) -> Optional[SearchResult]:
+        """Try to get result from cache."""
+        if not self.app_cache:
+            return None
+        cached = self.app_cache.get(cache_key, ttl_hours=ttl_hours)
+        if cached:
+            self.log.debug(f"Cache hit: {cached.get('title', '')[:50]}")
+            return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
+        return None
+
+    def _store_in_cache(self, track_key: str, result: SearchResult, isrc: Optional[str] = None):
+        """Store result in cache with optional ISRC key."""
+        if not self.app_cache:
+            return
+        cache_data = {"url": result.url, "title": result.title, "duration": result.duration}
+        self.app_cache.set(track_key, cache_data)
+        if isrc:
+            self.app_cache.set(f"isrc_{isrc}", cache_data)
+
     async def search(self, track: TrackMetadata) -> SearchResult:
         """Async search implementation with global scoring across templates."""
         # 1. Check ISRC Cache
-        if track.isrc:
-            if self.app_cache:
-                cached = self.app_cache.get(f"isrc_{track.isrc}", ttl_hours=24 * 30)
-                if cached:
-                    self.log.debug(f"Cache hit (ISRC): {track.title}")
-                    return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
-
+        if track.isrc and self.app_cache:
+            cached = self._get_from_cache(f"isrc_{track.isrc}", ttl_hours=24 * 30)
+            if cached:
+                return cached
             self.log.debug("ISRC sin cache: se omite lookup directo en YouTube para evitar falsos positivos")
 
         candidates: list[tuple[float, SearchResult]] = []
@@ -101,11 +117,9 @@ class YouTubeSearcher:
             query = template.format(artist=track.artist, title=track.title)
             cache_key = query.lower().strip()[:100]
 
-            if self.app_cache:
-                cached = self.app_cache.get(cache_key, ttl_hours=24 * 7)
-                if cached:
-                    self.log.debug(f"Cache hit: {track.title}")
-                    return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
+            cached = self._get_from_cache(cache_key, ttl_hours=24 * 7)
+            if cached:
+                return cached
 
             result = await self._lookup(cache_key, query, track.duration_seconds)
             if result:
@@ -117,26 +131,8 @@ class YouTubeSearcher:
         best_score, best_result = max(candidates, key=lambda x: x[0])
         self.log.debug(f"Seleccionado global: {best_result.title[:50]} (score={best_score:+.2f})")
 
-        if self.app_cache:
-            track_key = f"{track.artist} - {track.title}".lower().strip()[:100]
-            self.app_cache.set(
-                track_key,
-                {
-                    "url": best_result.url,
-                    "title": best_result.title,
-                    "duration": best_result.duration,
-                },
-            )
-
-            if track.isrc:
-                self.app_cache.set(
-                    f"isrc_{track.isrc}",
-                    {
-                        "url": best_result.url,
-                        "title": best_result.title,
-                        "duration": best_result.duration,
-                    },
-                )
+        track_key = f"{track.artist} - {track.title}".lower().strip()[:100]
+        self._store_in_cache(track_key, best_result, track.isrc)
 
         return best_result
 

@@ -77,22 +77,11 @@ def fetch_credits(isrc: str) -> dict:
         return {}
 
 
-def _get_recording_id(isrc: str, headers: dict) -> Optional[str]:
-    """Search by ISRC and return the first recording ID"""
-    url = f"https://musicbrainz.org/ws/2/recording?query=isrc:{isrc}&fmt=json"
-    resp = _rate_limited_get(url, headers=headers, timeout=5)
-
-    if resp.status_code != 200:
-        return None
-
-    data = resp.json()
-    recordings = data.get("recordings", [])
-
-    if not recordings:
-        return None
-
+def _score_recordings(recordings: list[dict]) -> Optional[str]:
+    """Extract and score recordings by confidence, returning best or first unscored."""
     scored = []
     unscored = []
+
     for rec in recordings:
         rec_id = rec.get("id")
         if not rec_id:
@@ -105,21 +94,29 @@ def _get_recording_id(isrc: str, headers: dict) -> Optional[str]:
 
         try:
             score = int(score_raw)
+            if score >= _MIN_RECORDING_SCORE:
+                scored.append((score, rec_id))
         except (TypeError, ValueError):
             continue
-
-        if score >= _MIN_RECORDING_SCORE:
-            scored.append((score, rec_id))
 
     if scored:
         scored.sort(key=lambda x: x[0], reverse=True)
         return scored[0][1]
 
-    # Fallback keeps backward compatibility when score field is absent.
-    if unscored:
-        return unscored[0]
+    return unscored[0] if unscored else None
 
-    return None
+
+def _get_recording_id(isrc: str, headers: dict) -> Optional[str]:
+    """Search by ISRC and return the first recording ID"""
+    url = f"https://musicbrainz.org/ws/2/recording?query=isrc:{isrc}&fmt=json"
+    resp = _rate_limited_get(url, headers=headers, timeout=5)
+
+    if resp.status_code != 200:
+        return None
+
+    data = resp.json()
+    recordings = data.get("recordings", [])
+    return _score_recordings(recordings) if recordings else None
 
 
 def _extract_credits_from_details(detail: dict, headers: dict) -> dict:

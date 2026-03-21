@@ -34,6 +34,20 @@ def _extract_lyrics(payload: dict) -> tuple[Optional[str], str]:
     return None, "none"
 
 
+def _try_lrclib_endpoint(url: str, params: dict) -> Optional[tuple[Optional[str], str]]:
+    """Try a single LRCLIB endpoint and extract lyrics if found."""
+    try:
+        resp = requests.get(
+            url, params=params, timeout=5 if "search" in url else 10, headers=LRCLIB_HEADERS)
+        if resp.status_code == 200:
+            lyrics, lyrics_type = _extract_lyrics(resp.json())
+            if lyrics:
+                return lyrics, lyrics_type
+    except Exception:
+        pass
+    return None
+
+
 def _fetch_lrclib(artist: str, title: str, album: str = "", duration_sec: int = 0) -> tuple[Optional[str], str]:
     """
     Try LRCLIB endpoints in descending precision:
@@ -50,53 +64,30 @@ def _fetch_lrclib(artist: str, title: str, album: str = "", duration_sec: int = 
             "duration": duration_sec,
         }
 
-        try:
-            resp = requests.get(
-                "https://lrclib.net/api/get-cached",
-                params=params,
-                timeout=5,
-                headers=LRCLIB_HEADERS,
-            )
-            if resp.status_code == 200:
-                lyrics, lyrics_type = _extract_lyrics(resp.json())
-                if lyrics:
-                    return lyrics, lyrics_type
-        except Exception:
-            pass
+        for endpoint in ["get-cached", "get"]:
+            result = _try_lrclib_endpoint(
+                f"https://lrclib.net/api/{endpoint}", params)
+            if result:
+                return result
 
-        try:
-            resp = requests.get(
-                "https://lrclib.net/api/get",
-                params=params,
-                timeout=10,
-                headers=LRCLIB_HEADERS,
-            )
-            if resp.status_code == 200:
-                lyrics, lyrics_type = _extract_lyrics(resp.json())
-                if lyrics:
-                    return lyrics, lyrics_type
-        except Exception:
-            pass
+    # Fallback to fuzzy search with partial metadata
+    search_params = {"track_name": title, "artist_name": artist}
+    if album:
+        search_params["album_name"] = album
 
     try:
         resp = requests.get(
             "https://lrclib.net/api/search",
-            params={
-                "track_name": title,
-                "artist_name": artist,
-                "album_name": album,
-            },
+            params=search_params,
             timeout=5,
             headers=LRCLIB_HEADERS,
         )
         if resp.status_code == 200:
             results = resp.json()
-            if isinstance(results, dict):
-                lyrics, lyrics_type = _extract_lyrics(results)
-                if lyrics:
-                    return lyrics, lyrics_type
-            elif results:
-                lyrics, lyrics_type = _extract_lyrics(results[0])
+            data = results if isinstance(
+                results, dict) else results[0] if results else None
+            if data:
+                lyrics, lyrics_type = _extract_lyrics(data)
                 if lyrics:
                     return lyrics, lyrics_type
     except Exception:
@@ -141,7 +132,8 @@ def fetch_lyrics_with_info(
     clean_title = _clean_title(title)
     clean_album = _clean_title(album) if album else ""
 
-    lyrics, lyrics_type = _fetch_lrclib(clean_artist, clean_title, clean_album, duration_sec)
+    lyrics, lyrics_type = _fetch_lrclib(
+        clean_artist, clean_title, clean_album, duration_sec)
     if lyrics:
         return lyrics, lyrics_type
 

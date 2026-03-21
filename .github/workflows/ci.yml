@@ -59,7 +59,7 @@ jobs:
           flake8 src/ \
             --max-line-length=120 \
             --ignore=W503 \
-            --max-complexity=15 \
+            --max-complexity=10 \
             --statistics \
             --count
 
