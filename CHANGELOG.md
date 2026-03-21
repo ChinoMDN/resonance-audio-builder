@@ -8,11 +8,12 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 ## [Unreleased]
 
 ### Changed
+
 - **CI/CD**: Aligned all code formatting and linting tools to 120-character line length for consistency
-  - Black formatter: `--line-length=120`
-  - isort: `--line-length=120 --profile=black`
-  - Flake8: `--max-line-length=120`
-  - Pylint: `--max-line-length=120`
+    - Black formatter: `--line-length=120`
+    - isort: `--line-length=120 --profile=black`
+    - Flake8: `--max-line-length=120`
+    - Pylint: `--max-line-length=120`
 - **Testing**: Reduced minimum coverage threshold from 74% to 70% to reflect realistic project maturity
 - **Code Quality**: Reformatted database initialization and UI markup handling for strict Black compliance
 
