@@ -36,8 +36,7 @@ class ProgressDB:
     def _init_db(self):
         """Inicializa esquema de la base de datos"""
         with self.lock:
-            self._conn.execute(
-                """
+            self._conn.execute("""
                 CREATE TABLE IF NOT EXISTS downloads (
                     track_id TEXT PRIMARY KEY,
                     artist TEXT,
@@ -48,8 +47,7 @@ class ProgressDB:
                     timestamp REAL,
                     retry_count INTEGER DEFAULT 0
                 )
-            """
-            )
+            """)
 
             self._conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON downloads(status)")
             self._conn.commit()

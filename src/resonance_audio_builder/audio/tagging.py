@@ -49,8 +49,7 @@ class MetadataWriter:
                 meta.producers = mb_credits.get("producers", [])
                 meta.engineers = mb_credits.get("engineers", [])
                 if meta.composers:
-                    self.log.debug(
-                        f"Fetched MusicBrainz credits for {meta.title}")
+                    self.log.debug(f"Fetched MusicBrainz credits for {meta.title}")
         except Exception as e:
             self.log.debug(f"Failed to fetch MusicBrainz credits: {e}")
 
@@ -75,9 +74,7 @@ class MetadataWriter:
             )
             if lyrics:
                 audio["\xa9lyr"] = lyrics
-                self.log.debug(
-                    f"Lyrics embedded for: {meta.title} (type={lyrics_type})"
-                )
+                self.log.debug(f"Lyrics embedded for: {meta.title} (type={lyrics_type})")
         except Exception:
             pass
 
@@ -106,8 +103,7 @@ class MetadataWriter:
         if meta.release_date and len(meta.release_date) >= 4:
             audio["\xa9day"] = meta.release_date[:4]  # Año
         if meta.genres:
-            main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[
-                0]
+            main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[0]
             audio["\xa9gen"] = main_genre
 
     def _write_m4a_copyright_tags(self, audio, meta: TrackMetadata):

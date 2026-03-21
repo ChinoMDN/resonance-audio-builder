@@ -4,9 +4,9 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 
+from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.core.builder import App
 from resonance_audio_builder.core.config import Config
-from resonance_audio_builder.audio.metadata import TrackMetadata
 
 
 class TestBuilderMenuAndAudit:
@@ -32,10 +32,8 @@ class TestBuilderMenuAndAudit:
         auditor.scan_library.return_value = {}
 
         with (
-            patch("resonance_audio_builder.core.builder.AudioAuditor",
-                  return_value=auditor),
-            patch("resonance_audio_builder.core.builder.Prompt.ask",
-                  return_value="n"),
+            patch("resonance_audio_builder.core.builder.AudioAuditor", return_value=auditor),
+            patch("resonance_audio_builder.core.builder.Prompt.ask", return_value="n"),
             patch("resonance_audio_builder.core.builder.console.print") as mock_print,
             patch("resonance_audio_builder.core.builder.console.input"),
             patch("resonance_audio_builder.core.builder.print_header"),
@@ -57,12 +55,9 @@ class TestBuilderMenuAndAudit:
         auditor.scan_library.return_value = {"HQ": result}
 
         with (
-            patch("resonance_audio_builder.core.builder.AudioAuditor",
-                  return_value=auditor),
-            patch("resonance_audio_builder.core.builder.Prompt.ask",
-                  return_value="y"),
-                patch("resonance_audio_builder.core.builder.console.expander",
-                      return_value=nullcontext(), create=True),
+            patch("resonance_audio_builder.core.builder.AudioAuditor", return_value=auditor),
+            patch("resonance_audio_builder.core.builder.Prompt.ask", return_value="y"),
+            patch("resonance_audio_builder.core.builder.console.expander", return_value=nullcontext(), create=True),
             patch("resonance_audio_builder.core.builder.console.print") as mock_print,
             patch("resonance_audio_builder.core.builder.console.input"),
             patch("resonance_audio_builder.core.builder.print_header"),
@@ -71,32 +66,26 @@ class TestBuilderMenuAndAudit:
             assert mock_print.called
 
     def test_start_download_writes_crash_log_on_critical_error(self, app, tmp_path):
-        fake_track = TrackMetadata(
-            track_id="id-1", title="Song", artist="Artist")
+        fake_track = TrackMetadata(track_id="id-1", title="Song", artist="Artist")
 
         with (
-            patch.object(app, "_get_selected_csvs",
-                         return_value=["ignored.csv"]),
+            patch.object(app, "_get_selected_csvs", return_value=["ignored.csv"]),
             patch.object(app, "_select_quality"),
             patch.object(app, "_collect_tracks", return_value=[fake_track]),
-            patch("resonance_audio_builder.core.builder.DownloadManager",
-                  side_effect=RuntimeError("boom")),
-            patch("resonance_audio_builder.core.builder.traceback.format_exc",
-                  return_value="trace"),
+            patch("resonance_audio_builder.core.builder.DownloadManager", side_effect=RuntimeError("boom")),
+            patch("resonance_audio_builder.core.builder.traceback.format_exc", return_value="trace"),
             patch("resonance_audio_builder.core.builder.open", mock_open(), create=True) as mocked_open,
             patch("resonance_audio_builder.core.builder.console.print"),
             patch("resonance_audio_builder.core.builder.console.input"),
         ):
             app._start_download()
-            mocked_open.assert_called_once_with(
-                "crash.log", "w", encoding="utf-8")
+            mocked_open.assert_called_once_with("crash.log", "w", encoding="utf-8")
 
     def test_run_routes_to_exit_option(self, app):
         with (
             patch.object(app, "_check_dependencies", return_value=True),
             patch.object(app, "_show_status"),
-            patch("resonance_audio_builder.core.builder.Prompt.ask",
-                  side_effect=["5"]),
+            patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["5"]),
             patch("resonance_audio_builder.core.builder.console.print") as mock_print,
             patch("resonance_audio_builder.core.builder.print_header"),
         ):
@@ -109,8 +98,7 @@ class TestBuilderMenuAndAudit:
             patch.object(app, "_show_status"),
             patch.object(app, "_start_download") as mock_start_download,
             patch.object(app, "_notify_end") as mock_notify,
-            patch("resonance_audio_builder.core.builder.Prompt.ask",
-                  side_effect=["1", "5"]),
+            patch("resonance_audio_builder.core.builder.Prompt.ask", side_effect=["1", "5"]),
             patch("resonance_audio_builder.core.builder.console.input"),
             patch("resonance_audio_builder.core.builder.console.print"),
             patch("resonance_audio_builder.core.builder.print_header"),

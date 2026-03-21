@@ -1,7 +1,7 @@
-from typing import Optional
 import re
-import requests
+from typing import Optional
 
+import requests
 
 LRCLIB_HEADERS = {
     "User-Agent": "ResonanceAudioBuilder/1.0 (https://github.com/resonance)",
@@ -141,8 +141,7 @@ def fetch_lyrics_with_info(
     clean_title = _clean_title(title)
     clean_album = _clean_title(album) if album else ""
 
-    lyrics, lyrics_type = _fetch_lrclib(
-        clean_artist, clean_title, clean_album, duration_sec)
+    lyrics, lyrics_type = _fetch_lrclib(clean_artist, clean_title, clean_album, duration_sec)
     if lyrics:
         return lyrics, lyrics_type
 

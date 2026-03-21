@@ -61,8 +61,7 @@ class AudioDownloader:
             return False
 
         try:
-            cmd = ["ffprobe", "-v", "error", "-show_format",
-                   "-show_streams", "-of", "json", str(path)]
+            cmd = ["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", str(path)]
 
             # Async subprocess
             proc = await asyncio.create_subprocess_exec(
@@ -108,8 +107,7 @@ class AudioDownloader:
         mobile_folder = Path(self.cfg.OUTPUT_FOLDER_MOBILE) / subfolder
 
         needed_hq = self.cfg.MODE in [QualityMode.HQ_ONLY, QualityMode.BOTH]
-        needed_mobile = self.cfg.MODE in [
-            QualityMode.MOBILE_ONLY, QualityMode.BOTH]
+        needed_mobile = self.cfg.MODE in [QualityMode.MOBILE_ONLY, QualityMode.BOTH]
 
         if needed_hq:
             hq_folder.mkdir(parents=True, exist_ok=True)
@@ -142,8 +140,7 @@ class AudioDownloader:
         raw_path = None
         try:
             # 1. Setup paths and check existence
-            hq_path, mobile_path, needed_hq, needed_mobile = self._prepare_download_paths(
-                subfolder, track)
+            hq_path, mobile_path, needed_hq, needed_mobile = self._prepare_download_paths(subfolder, track)
             hq_exists, mobile_exists = await self._check_existing_files(hq_path, mobile_path, needed_hq, needed_mobile)
 
             todo_hq = needed_hq and not hq_exists
@@ -202,8 +199,7 @@ class AudioDownloader:
         if track.cover_url in self._cover_cache:
             track.cover_data = self._cover_cache[track.cover_url]
             if not track.cover_data:
-                self.log.debug(
-                    f"Cover cache hit vacío para: {track.title} ({track.cover_url})")
+                self.log.debug(f"Cover cache hit vacío para: {track.title} ({track.cover_url})")
             return
 
         cover = await self._download_cover(track.cover_url)
@@ -215,19 +211,16 @@ class AudioDownloader:
         track.cover_data = cover
 
         if not cover:
-            self.log.debug(
-                f"Cover no disponible para: {track.title} ({track.cover_url})")
+            self.log.debug(f"Cover no disponible para: {track.title} ({track.cover_url})")
 
     async def _perform_transcoding_pipeline(
         self, raw_path, hq_path, mobile_path, track, todo_hq, todo_mob
     ) -> Tuple[bool, int]:
         tasks = []
         if todo_hq:
-            tasks.append(self._transcode(
-                raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE))
+            tasks.append(self._transcode(raw_path, hq_path, self.cfg.QUALITY_HQ_BITRATE))
         if todo_mob:
-            tasks.append(self._transcode(raw_path, mobile_path,
-                         self.cfg.QUALITY_MOBILE_BITRATE))
+            tasks.append(self._transcode(raw_path, mobile_path, self.cfg.QUALITY_MOBILE_BITRATE))
 
         results = await asyncio.gather(*tasks)
 
@@ -297,16 +290,14 @@ class AudioDownloader:
                         self.log.debug(f"Cover HTTP {resp.status}: {url}")
                         return None
             except (asyncio.TimeoutError, aiohttp.ServerTimeoutError, aiohttp.ClientResponseError):
-                self.log.debug(
-                    f"Cover timeout (intento {attempt + 1}/3): {url}")
+                self.log.debug(f"Cover timeout (intento {attempt + 1}/3): {url}")
                 if attempt < 2:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
             except aiohttp.ClientError as e:
                 self.log.debug(f"Cover network error: {e} | {url}")
                 return None
             except Exception as e:
-                self.log.debug(
-                    f"Cover error inesperado: {type(e).__name__}: {e} | {url}")
+                self.log.debug(f"Cover error inesperado: {type(e).__name__}: {e} | {url}")
                 return None
 
         self.log.debug(f"Cover no disponible tras 3 intentos: {url}")
@@ -352,8 +343,7 @@ class AudioDownloader:
 
         # Genre - take first from list
         if track.genres:
-            first_genre = track.genre_list[0] if track.genre_list else track.genres.split(",")[
-                0]
+            first_genre = track.genre_list[0] if track.genre_list else track.genres.split(",")[0]
             audio["\xa9gen"] = [first_genre.strip().title()]
 
         # Label/Copyright
@@ -375,9 +365,7 @@ class AudioDownloader:
         if track.cover_data:
             self._embed_cover_m4a(audio, track.cover_data)
         else:
-            self.log.debug(
-                f"Sin cover_data para: {track.title} (cover_url={track.cover_url!r})"
-            )
+            self.log.debug(f"Sin cover_data para: {track.title} (cover_url={track.cover_url!r})")
 
         self._apply_m4a_lyrics(audio, track)
         self._apply_m4a_composer(audio, track)
@@ -402,9 +390,7 @@ class AudioDownloader:
             )
             if lyrics:
                 audio["\xa9lyr"] = [lyrics]
-                self.log.debug(
-                    f"Letras embebidas: {track.title} (tipo={lyrics_type})"
-                )
+                self.log.debug(f"Letras embebidas: {track.title} (tipo={lyrics_type})")
         except Exception as e:
             self.log.debug(f"Error obteniendo letras: {e}")
 
@@ -430,9 +416,7 @@ class AudioDownloader:
                 fmt = MP4Cover.FORMAT_PNG
             else:
                 # Unknown format, skip to avoid corruption
-                self.log.debug(
-                    f"Formato de imagen no reconocido, magic bytes: {data[:4].hex()}"
-                )
+                self.log.debug(f"Formato de imagen no reconocido, magic bytes: {data[:4].hex()}")
                 return
 
             audio["covr"] = [MP4Cover(data, imageformat=fmt)]
@@ -467,8 +451,7 @@ class AudioDownloader:
         }
 
         if self.cfg.DEBUG_MODE:
-            opts.update(
-                {"quiet": False, "no_warnings": False, "verbose": True})
+            opts.update({"quiet": False, "no_warnings": False, "verbose": True})
 
         if proxy:
             opts["proxy"] = proxy
@@ -548,8 +531,7 @@ class AudioDownloader:
 
         err_str = str(e).lower()
         if "429" in err_str or "too many requests" in err_str:
-            self.log.warning(
-                "YouTube Rate Limit detected (HTTP 429). Pausing for 60s...")
+            self.log.warning("YouTube Rate Limit detected (HTTP 429). Pausing for 60s...")
             time.sleep(60)
             raise RecoverableError("Rate Limit (429) - Retrying after pause")
 
@@ -602,8 +584,7 @@ class AudioDownloader:
             if proc.returncode == 0 and output_path.exists() and output_path.stat().st_size > 0:
                 return True
 
-            self.log.debug(
-                f"Transcode failed (RC={proc.returncode}): {stderr.decode(errors='ignore')}")
+            self.log.debug(f"Transcode failed (RC={proc.returncode}): {stderr.decode(errors='ignore')}")
             if output_path.exists():
                 try:
                     os.remove(output_path)

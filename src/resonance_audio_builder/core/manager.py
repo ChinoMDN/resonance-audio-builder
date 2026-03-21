@@ -36,18 +36,15 @@ class DownloadManager:
         self.log.set_tracker(self.ui)
 
         # Init Proxy Manager (Async compliant)
-        self.proxy_manager = SmartProxyManager(
-            self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
+        self.proxy_manager = SmartProxyManager(self.cfg.PROXIES_FILE, self.cfg.USE_PROXIES)
 
         # Init Circuit Breaker (3 failures in 300s -> Stop)
         from resonance_audio_builder.network.limiter import CircuitBreaker
 
         self.circuit_breaker = CircuitBreaker(threshold=3, cooldown=300)
 
-        self.downloader = AudioDownloader(
-            self.cfg, self.log, self.proxy_manager)
-        self.searcher = YouTubeSearcher(
-            self.cfg, self.log, self.cache, self.proxy_manager)
+        self.downloader = AudioDownloader(self.cfg, self.log, self.proxy_manager)
+        self.searcher = YouTubeSearcher(self.cfg, self.log, self.cache, self.proxy_manager)
         self.metadata_writer = MetadataWriter(self.log)
         self.keyboard = KeyboardController(self.log)
 
@@ -182,8 +179,7 @@ class DownloadManager:
 
     def _print_batch_summary(self, tracks: List[TrackMetadata], pending: List[TrackMetadata]):
         """Muestra el resumen visual de la cola de descarga"""
-        table = Table(
-            title=f"Download Queue ({len(pending)} pending)", expand=True, box=None)
+        table = Table(title=f"Download Queue ({len(pending)} pending)", expand=True, box=None)
         table.add_column("Track", style="bold white")
         table.add_column("Artist", style="cyan")
         table.add_column("Status", justify="right")
@@ -192,13 +188,11 @@ class DownloadManager:
         for t in tracks:
             if self.state.is_done(t.track_id):
                 if done_count < 10:
-                    table.add_row(t.title, t.artist,
-                                  "[green]✔ Downloaded[/green]")
+                    table.add_row(t.title, t.artist, "[green]✔ Downloaded[/green]")
                 done_count += 1
 
         if done_count > 10:
-            table.add_row(
-                "...", "...", f"[dim]+ {done_count - 10} more done[/dim]")
+            table.add_row("...", "...", f"[dim]+ {done_count - 10} more done[/dim]")
 
         pending_count = 0
         for t in pending:
@@ -207,8 +201,7 @@ class DownloadManager:
             pending_count += 1
 
         if pending_count > 20:
-            table.add_row(
-                "...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
+            table.add_row("...", "...", f"[dim]+ {pending_count - 20} more pending[/dim]")
 
         console.print(Panel(table, border_style="blue"))
 
@@ -221,8 +214,7 @@ class DownloadManager:
         summary.add_row("To Download:", f"[yellow]{len(pending)}[/yellow]")
         summary.add_row("Quality Mode:", f"[magenta]{self.cfg.MODE}[/magenta]")
 
-        console.print(
-            Panel(summary, title="Batch Summary", border_style="green"))
+        console.print(Panel(summary, title="Batch Summary", border_style="green"))
 
     async def _process_track_attempts(self, track: TrackMetadata, task_id: str) -> bool:
         """Maneja los reintentos para una canción específica con gestión de errores detallada"""
@@ -250,8 +242,7 @@ class DownloadManager:
                 await asyncio.sleep(2 * attempt)
 
         if not self.keyboard.should_quit():
-            self.ui.update_task_status(
-                task_id, f"[red]Failed: {last_error}[/red]")
+            self.ui.update_task_status(task_id, f"[red]Failed: {last_error}[/red]")
             self.state.mark(track, "error", error=last_error)
             self.ui.update_main_progress(1)
             self.failed_tracks.append((track, last_error))
@@ -263,8 +254,7 @@ class DownloadManager:
         """Realiza un único intento de búsqueda y descarga. Retorna (success, is_fatal, error_msg)"""
         try:
             # 1. Search
-            self.ui.update_task_status(
-                task_id, f"[cyan]Searching (Attempt {attempt})...[/cyan]")
+            self.ui.update_task_status(task_id, f"[cyan]Searching (Attempt {attempt})...[/cyan]")
             search_result = await self.searcher.search(track)
 
             # 2. Download
@@ -283,8 +273,7 @@ class DownloadManager:
             # Success logic
             status = "[yellow]Skipped[/yellow]" if result.skipped else "[green]Success[/green]"
             self.ui.update_task_status(task_id, status)
-            self.state.mark(
-                track, "skip" if result.skipped else "ok", result.bytes)
+            self.state.mark(track, "skip" if result.skipped else "ok", result.bytes)
             self.ui.update_main_progress(1)
 
             # Record success to close breaker if half-open
@@ -303,8 +292,7 @@ class DownloadManager:
             return False, False, str(e)
         except Exception as e:
             self.ui.update_task_status(task_id, f"[red]Error: {e}[/red]")
-            self.log.debug(
-                f"Unexpected error for {track.title}: {traceback.format_exc()}")
+            self.log.debug(f"Unexpected error for {track.title}: {traceback.format_exc()}")
             return False, True, str(e)
 
     def _save_failed(self):
@@ -314,14 +302,12 @@ class DownloadManager:
             with open(self.cfg.ERROR_FILE, "w", encoding="utf-8") as f:
                 f.write(f"CANCIONES FALLIDAS - {datetime.now()}\n\n")
                 for track, error in self.failed_tracks:
-                    f.write(
-                        f"• {track.artist} - {track.title}\n  Error: {error}\n\n")
+                    f.write(f"• {track.artist} - {track.title}\n  Error: {error}\n\n")
 
             with open(self.cfg.ERROR_CSV, "w", encoding="utf-8", newline="") as f:
                 if self.failed_tracks:
                     # Get all fieldnames from raw_data plus playlist_subfolder
-                    base_fields = list(
-                        self.failed_tracks[0][0].raw_data.keys())
+                    base_fields = list(self.failed_tracks[0][0].raw_data.keys())
                     all_fields = base_fields + ["playlist_subfolder"]
 
                     writer = csv.DictWriter(f, fieldnames=all_fields)
@@ -329,8 +315,7 @@ class DownloadManager:
                     for track, _ in self.failed_tracks:
                         row_data = track.raw_data.copy()
                         # Add playlist_subfolder if it exists
-                        row_data["playlist_subfolder"] = getattr(
-                            track, "playlist_subfolder", "")
+                        row_data["playlist_subfolder"] = getattr(track, "playlist_subfolder", "")
                         writer.writerow(row_data)
         except Exception as e:
             self.log.error(f"Failed to record failed tracks: {e}")
@@ -342,8 +327,7 @@ class DownloadManager:
         self.ui.show_summary(stats)
 
         if self.failed_tracks:
-            console.print(
-                f"[yellow]Failed tracks saved to: {self.cfg.ERROR_FILE}[/yellow]")
+            console.print(f"[yellow]Failed tracks saved to: {self.cfg.ERROR_FILE}[/yellow]")
 
         self._save_session_history(stats)
         self._generate_session_m3us(stats)
@@ -368,8 +352,7 @@ class DownloadManager:
             from resonance_audio_builder.core.utils import export_playlist_m3us
 
             playlist_tracks_map = self._build_playlist_map()
-            self._export_m3us_for_mode(
-                export_playlist_m3us, playlist_tracks_map)
+            self._export_m3us_for_mode(export_playlist_m3us, playlist_tracks_map)
             self._log_m3u_result(playlist_tracks_map)
         except Exception as e:
             self.log.debug(f"M3U generation error: {e}")

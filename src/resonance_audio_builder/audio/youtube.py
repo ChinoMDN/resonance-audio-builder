@@ -37,14 +37,16 @@ class YouTubeSearcher:
     ]
 
     HARD_EXCLUDES = ("cover", "remix", "live", "karaoke", "instrumental")
-    VERSION_PENALTY_TOKENS = frozenset((
-        "lyrics",
-        "lyric",
-        "house",
-        "slowed",
-        "nightcore",
-        "8d",
-    ))
+    VERSION_PENALTY_TOKENS = frozenset(
+        (
+            "lyrics",
+            "lyric",
+            "house",
+            "slowed",
+            "nightcore",
+            "8d",
+        )
+    )
     VERSION_PENALTY_PHRASES = (
         "vocals only",
         "korean ver",
@@ -67,10 +69,8 @@ class YouTubeSearcher:
         self.app_cache = cache_manager
         self.proxy_manager = proxy_manager
         self._cookies_valid = validate_cookies_file(config.COOKIES_FILE)
-        max_workers = max(
-            1, int(getattr(self.cfg, "MAX_CONCURRENT_SEARCHES", 4)))
-        self._executor = ThreadPoolExecutor(
-            max_workers=max_workers, thread_name_prefix="yt_search")
+        max_workers = max(1, int(getattr(self.cfg, "MAX_CONCURRENT_SEARCHES", 4)))
+        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="yt_search")
 
     def close(self):
         """Release search executor resources."""
@@ -87,14 +87,12 @@ class YouTubeSearcher:
         # 1. Check ISRC Cache
         if track.isrc:
             if self.app_cache:
-                cached = self.app_cache.get(
-                    f"isrc_{track.isrc}", ttl_hours=24 * 30)
+                cached = self.app_cache.get(f"isrc_{track.isrc}", ttl_hours=24 * 30)
                 if cached:
                     self.log.debug(f"Cache hit (ISRC): {track.title}")
                     return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
 
-            self.log.debug(
-                "ISRC sin cache: se omite lookup directo en YouTube para evitar falsos positivos")
+            self.log.debug("ISRC sin cache: se omite lookup directo en YouTube para evitar falsos positivos")
 
         candidates: list[tuple[float, SearchResult]] = []
 
@@ -114,12 +112,10 @@ class YouTubeSearcher:
                 candidates.append(result)
 
         if not candidates:
-            raise NotFoundError(
-                f"No encontrado: {track.artist} - {track.title}")
+            raise NotFoundError(f"No encontrado: {track.artist} - {track.title}")
 
         best_score, best_result = max(candidates, key=lambda x: x[0])
-        self.log.debug(
-            f"Seleccionado global: {best_result.title[:50]} (score={best_score:+.2f})")
+        self.log.debug(f"Seleccionado global: {best_result.title[:50]} (score={best_score:+.2f})")
 
         if self.app_cache:
             track_key = f"{track.artist} - {track.title}".lower().strip()[:100]
@@ -150,6 +146,7 @@ class YouTubeSearcher:
         loop = asyncio.get_running_loop()
 
         try:
+
             def _extract():
                 with yt_dlp.YoutubeDL(opts) as ydl:
                     return ydl.extract_info(f"ytsearch5:{query}", download=False)
@@ -197,13 +194,11 @@ class YouTubeSearcher:
         if not entries:
             return None
 
-        scored = [(self._score_entry(e, query, duration), e)
-                  for e in entries if e]
+        scored = [(self._score_entry(e, query, duration), e) for e in entries if e]
 
         self.log.debug(f"Query: {query!r} | Candidatos:")
         for score, entry in sorted(scored, key=lambda x: x[0], reverse=True):
-            self.log.debug(
-                f"  [{score:+.1f}] {entry.get('title', '')[:60]} ({entry.get('duration', 0)}s)")
+            self.log.debug(f"  [{score:+.1f}] {entry.get('title', '')[:60]} ({entry.get('duration', 0)}s)")
 
         valid = [(s, e) for s, e in scored if s > float("-inf")]
         if not valid:
@@ -216,13 +211,11 @@ class YouTubeSearcher:
             self.log.debug("Entry sin URL válida, descartando")
             return None
 
-        sr = SearchResult(url=url, title=best_entry.get(
-            "title", ""), duration=best_entry.get("duration", 0))
+        sr = SearchResult(url=url, title=best_entry.get("title", ""), duration=best_entry.get("duration", 0))
         self.log.debug(f"Encontrado: {sr.title[:50]}")
 
         if self.app_cache:
-            self.app_cache.set(
-                cache_key, {"url": sr.url, "title": sr.title, "duration": sr.duration})
+            self.app_cache.set(cache_key, {"url": sr.url, "title": sr.title, "duration": sr.duration})
 
         return best_score, sr
 
@@ -235,8 +228,7 @@ class YouTubeSearcher:
         hard_excludes = set(self.HARD_EXCLUDES)
 
         if title_tokens & hard_excludes and not query_tokens & hard_excludes:
-            self.log.debug(
-                f"Score descartado por exclude: {entry_title[:60]} | query={query!r}")
+            self.log.debug(f"Score descartado por exclude: {entry_title[:60]} | query={query!r}")
             return float("-inf")
 
         score = 0.0
@@ -259,9 +251,7 @@ class YouTubeSearcher:
         score += overlap_bonus
 
         token_hits = len(title_tokens & self.VERSION_PENALTY_TOKENS)
-        phrase_hits = sum(
-            1 for phrase in self.VERSION_PENALTY_PHRASES if phrase in title_norm
-        )
+        phrase_hits = sum(1 for phrase in self.VERSION_PENALTY_PHRASES if phrase in title_norm)
         version_hits_count = token_hits + phrase_hits
         if version_hits_count:
             version_penalty = version_hits_count * 2.0

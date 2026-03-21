@@ -50,8 +50,7 @@ class TestManagerFullCoverage:
 
         manager.searcher.search = AsyncMock(return_value=search_res)
         # Result has bytes=1024
-        manager.downloader.download = AsyncMock(
-            return_value=DownloadResult(True, 1024))
+        manager.downloader.download = AsyncMock(return_value=DownloadResult(True, 1024))
 
         # Ejecutamos la lógica de procesamiento de UN track
         await manager._process_track_attempts(track, "worker_1")
@@ -70,10 +69,8 @@ class TestManagerFullCoverage:
         search_res = SearchResult("url", "Retry", 120)
 
         # Primer intento falla (Recoverable), segundo éxito
-        manager.searcher.search = AsyncMock(
-            side_effect=[RecoverableError("Network Glitch"), search_res])
-        manager.downloader.download = AsyncMock(
-            return_value=DownloadResult(True, 1024))
+        manager.searcher.search = AsyncMock(side_effect=[RecoverableError("Network Glitch"), search_res])
+        manager.downloader.download = AsyncMock(return_value=DownloadResult(True, 1024))
 
         # Mockeamos sleep para que el test no tarde
         with patch("asyncio.sleep", new_callable=AsyncMock):
@@ -89,8 +86,7 @@ class TestManagerFullCoverage:
         track = TrackMetadata("id3", "Fatal", "Artist")
 
         # Search lanza error fatal
-        manager.searcher.search = AsyncMock(
-            side_effect=FatalError("Not Found anywhere"))
+        manager.searcher.search = AsyncMock(side_effect=FatalError("Not Found anywhere"))
 
         await manager._process_track_attempts(track, "worker_1")
 
@@ -114,10 +110,8 @@ class TestManagerFullCoverage:
     @pytest.mark.asyncio
     async def test_pause_logic(self, manager):
         """Verifica que el worker espere si está pausado."""
-        manager.keyboard.is_paused.side_effect = [
-            True, True, False]  # Pausa 2 ciclos, luego resume
-        manager.keyboard.should_quit.side_effect = [
-            False, False, False, True]  # Eventually quit to stop loop
+        manager.keyboard.is_paused.side_effect = [True, True, False]  # Pausa 2 ciclos, luego resume
+        manager.keyboard.should_quit.side_effect = [False, False, False, True]  # Eventually quit to stop loop
 
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             # We mock queue.get to wait or return item
@@ -125,8 +119,7 @@ class TestManagerFullCoverage:
 
             # Important: queue is an asyncio.Queue instance, not a Mock. We must replace it or patch `get`
             manager.queue = MagicMock()
-            manager.queue.get = AsyncMock(
-                side_effect=[track, asyncio.CancelledError])
+            manager.queue.get = AsyncMock(side_effect=[track, asyncio.CancelledError])
             manager.queue.task_done = MagicMock()
 
             # Mock process to finish quickly
@@ -148,16 +141,14 @@ class TestManagerFullCoverage:
     @pytest.mark.asyncio
     async def test_run_flow(self, manager):
         """Test the run method execution flow using Queue mocks"""
-        tracks = [TrackMetadata("id1", "T", "A"),
-                  TrackMetadata("id2", "T2", "A2")]
+        tracks = [TrackMetadata("id1", "T", "A"), TrackMetadata("id2", "T2", "A2")]
 
         # Keep worker fan-out small for deterministic test behavior.
         manager.cfg.MAX_WORKERS = 2
 
         # Setup mocks
         manager.state.is_done.return_value = False
-        manager.state.get_stats.return_value = {
-            "ok": 0, "skip": 0, "error": 0, "bytes": 0}
+        manager.state.get_stats.return_value = {"ok": 0, "skip": 0, "error": 0, "bytes": 0}
         manager.keyboard.should_quit.return_value = False
 
         # Mock Queue completely to avoid async loop issues
@@ -180,8 +171,7 @@ class TestManagerFullCoverage:
             return task
 
         with (
-            patch("resonance_audio_builder.core.manager.Confirm.ask",
-                  return_value=True),
+            patch("resonance_audio_builder.core.manager.Confirm.ask", return_value=True),
             patch("resonance_audio_builder.core.manager.console.print"),
             patch("asyncio.create_task", side_effect=fake_create_task) as mock_create_task,
             patch("asyncio.sleep", return_value=f),
@@ -202,8 +192,7 @@ class TestManagerFullCoverage:
 
     def test_print_batch_summary(self, manager):
         """Test the UI summary printing"""
-        tracks = [TrackMetadata("id1", "Done", "A"),
-                  TrackMetadata("id2", "Pending", "B")]
+        tracks = [TrackMetadata("id1", "Done", "A"), TrackMetadata("id2", "Pending", "B")]
         pending = [tracks[1]]
 
         manager.state.is_done.side_effect = lambda tid: tid == "id1"
@@ -224,39 +213,33 @@ class TestManagerFullCoverage:
         track = TrackMetadata("id_edge", "Title", "Artist")
 
         # Case 1: Search failure (Recoverable)
-        manager.searcher.search = AsyncMock(
-            side_effect=RecoverableError("Search Hub Issue"))
+        manager.searcher.search = AsyncMock(side_effect=RecoverableError("Search Hub Issue"))
         success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
         assert success is False
         assert fatal is False
         assert "Search Hub Issue" in err
 
         # Case 2: Search failure (Fatal)
-        manager.searcher.search = AsyncMock(
-            side_effect=FatalError("Copyright Block"))
+        manager.searcher.search = AsyncMock(side_effect=FatalError("Copyright Block"))
         success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
         assert success is False
         assert fatal is True
 
         # Case 3: Download failure (Recoverable)
-        manager.searcher.search = AsyncMock(
-            return_value=SearchResult("url", "T", 100))
-        manager.downloader.download = AsyncMock(
-            return_value=DownloadResult(False, 0, error="Http 403"))
+        manager.searcher.search = AsyncMock(return_value=SearchResult("url", "T", 100))
+        manager.downloader.download = AsyncMock(return_value=DownloadResult(False, 0, error="Http 403"))
         success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
         assert success is False
         assert fatal is False
 
         # Case 4: Download Skipped
-        manager.downloader.download = AsyncMock(
-            return_value=DownloadResult(True, 0, skipped=True))
+        manager.downloader.download = AsyncMock(return_value=DownloadResult(True, 0, skipped=True))
         success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
         assert success is True
         manager.state.mark.assert_called_with(track, "skip", 0)
 
         # Case 5: Unexpected Exception (Generic)
-        manager.searcher.search = AsyncMock(
-            side_effect=RuntimeError("Extreme Error"))
+        manager.searcher.search = AsyncMock(side_effect=RuntimeError("Extreme Error"))
         success, fatal, err = await manager._attempt_download_iteration(track, "t1", 1)
         assert success is False
         assert fatal is True
