@@ -11,22 +11,33 @@ from typing import Optional
 
 import requests
 
-# Global rate limiter - MusicBrainz allows 1 request/second
-_rate_lock = threading.Lock()
-_last_request_time = 0.0
 _MIN_INTERVAL = 1.1  # Slightly over 1 second to be safe
+_MIN_RECORDING_SCORE = 85
+
+
+class _RateLimiter:
+    """Simple per-process limiter for MusicBrainz requests."""
+
+    def __init__(self, min_interval: float):
+        self._lock = threading.Lock()
+        self._last_request_time = 0.0
+        self._min_interval = min_interval
+
+    def wait_turn(self):
+        with self._lock:
+            now = time.time()
+            elapsed = now - self._last_request_time
+            if elapsed < self._min_interval:
+                time.sleep(self._min_interval - elapsed)
+            self._last_request_time = time.time()
+
+
+_rate_limiter = _RateLimiter(_MIN_INTERVAL)
 
 
 def _rate_limited_get(url: str, headers: dict, timeout: int = 5):
     """Make a rate-limited GET request to MusicBrainz"""
-    global _last_request_time
-
-    with _rate_lock:
-        now = time.time()
-        elapsed = now - _last_request_time
-        if elapsed < _MIN_INTERVAL:
-            time.sleep(_MIN_INTERVAL - elapsed)
-        _last_request_time = time.time()
+    _rate_limiter.wait_turn()
 
     return requests.get(url, headers=headers, timeout=timeout)
 
@@ -80,7 +91,35 @@ def _get_recording_id(isrc: str, headers: dict) -> Optional[str]:
     if not recordings:
         return None
 
-    return recordings[0].get("id")
+    scored = []
+    unscored = []
+    for rec in recordings:
+        rec_id = rec.get("id")
+        if not rec_id:
+            continue
+
+        score_raw = rec.get("score")
+        if score_raw is None:
+            unscored.append(rec_id)
+            continue
+
+        try:
+            score = int(score_raw)
+        except (TypeError, ValueError):
+            continue
+
+        if score >= _MIN_RECORDING_SCORE:
+            scored.append((score, rec_id))
+
+    if scored:
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return scored[0][1]
+
+    # Fallback keeps backward compatibility when score field is absent.
+    if unscored:
+        return unscored[0]
+
+    return None
 
 
 def _extract_credits_from_details(detail: dict, headers: dict) -> dict:
@@ -88,10 +127,16 @@ def _extract_credits_from_details(detail: dict, headers: dict) -> dict:
     composers = []
     producers = []
     engineers = []
+    work_ids = []
 
-    # Extract from artist relations
     for rel in detail.get("relations", []):
         rel_type = rel.get("type", "").lower()
+
+        if rel_type == "performance":
+            work_id = rel.get("work", {}).get("id")
+            if work_id:
+                work_ids.append(work_id)
+
         artist = rel.get("artist", {})
         name = artist.get("name", "")
 
@@ -105,14 +150,12 @@ def _extract_credits_from_details(detail: dict, headers: dict) -> dict:
         elif rel_type in ("engineer", "mix", "mastering"):
             engineers.append(name)
 
-    # Also check work relations for composers
-    for work_rel in detail.get("relations", []):
-        if work_rel.get("type") == "performance":
-            work = work_rel.get("work", {})
-            work_id = work.get("id")
-            if work_id:
-                work_composers = _fetch_work_composers(work_id, headers)
-                composers.extend(work_composers)
+    if work_ids:
+        unique_work_ids = list(dict.fromkeys(work_ids))
+        # MusicBrainz is strictly rate-limited (1 req/s), so deterministic
+        # sequential calls are safer than thread fan-out here.
+        for work_id in unique_work_ids:
+            composers.extend(_fetch_work_composers(work_id, headers))
 
     return {
         "composers": list(dict.fromkeys(composers)),

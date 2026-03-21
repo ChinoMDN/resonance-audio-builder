@@ -23,6 +23,8 @@ Before opening a new issue:
 
 Well-documented bug reports help issues get resolved faster.
 
+When relevant, include targeted excerpts from `debug.log` (for example: YouTube candidate scores, cover retry attempts, and lyric type logs `synced/plain`).
+
 ---
 
 ### Suggesting Features
@@ -104,7 +106,7 @@ Consistency and readability are prioritized over micro-optimizations.
 
 ---
 
-## Code Structure (v7.x)
+## Code Structure
 
 The project follows a domain-driven modular architecture:
 

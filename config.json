@@ -14,7 +14,7 @@
     "verify_md5": true,
     "generate_m3u": true,
     "save_history": true,
-    "debug_mode": false,
+    "debug_mode": true,
     "output_format": "m4a",
     "embed_lyrics": true
 }

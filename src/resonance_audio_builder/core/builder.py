@@ -270,31 +270,16 @@ class App:
             console.input("\n[bold cyan]Presiona ENTER para volver...[/bold cyan]")
             return
 
-        tracks = []
-        for row in rows:
-            t = TrackMetadata.from_csv_row(row)
-            # Restore playlist_subfolder if it exists in the CSV
-            if "playlist_subfolder" in row and row["playlist_subfolder"]:
-                setattr(t, "playlist_subfolder", row["playlist_subfolder"])
-            tracks.append(t)
+        # Show a lightweight summary before launching the regular download flow.
+        unique_track_ids = {TrackMetadata.from_csv_row(row).track_id for row in rows}
+        print(f"\n[i] {len(unique_track_ids)} canciones fallidas a reintentar")
 
-        # Eliminar duplicados
-        unique = {}
-        for t in tracks:
-            if t.track_id not in unique:
-                unique[t.track_id] = t
+        retry = Prompt.ask("Reintentar ahora? (y/n)", choices=["y", "n"], default="y")
+        if retry.lower() != "y":
+            return
 
-        tracks = list(unique.values())
-
-        print(f"\n[i] {len(tracks)} canciones fallidas a reintentar")
-
-        self._select_quality()
-
-        # Ejecutar descarga
-        manager = DownloadManager(self.cfg, self.cache)
-        asyncio.run(manager.run(tracks))
-
-        input("\nENTER para continuar...")
+        # Reuse the standard pipeline (quality selection, deduplication, manager lifecycle).
+        self._start_download(csv_files=[self.cfg.ERROR_CSV], ask_quality=True)
 
     def _perform_clear(self, sel: str) -> List[str]:
         """Ejecuta la limpieza solicitada"""

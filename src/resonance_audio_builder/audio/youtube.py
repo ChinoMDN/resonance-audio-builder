@@ -1,10 +1,10 @@
 import asyncio
-import json
-import os
 import random
-import time
+import re
+import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Optional
 
 import yt_dlp
 
@@ -30,6 +30,31 @@ class SearchResult:
 class YouTubeSearcher:
     """Async YouTube search engine using yt-dlp with caching and proxy support."""
 
+    QUERY_TEMPLATES = [
+        "{artist} - {title} Audio",
+        "{artist} {title} - Topic",
+        "{artist} {title} Official Audio",
+    ]
+
+    HARD_EXCLUDES = ("cover", "remix", "live", "karaoke", "instrumental")
+    VERSION_PENALTY_TOKENS = frozenset((
+        "lyrics",
+        "lyric",
+        "house",
+        "slowed",
+        "nightcore",
+        "8d",
+    ))
+    VERSION_PENALTY_PHRASES = (
+        "vocals only",
+        "korean ver",
+        "english ver",
+        "from the first take",
+        "sped up",
+    )
+    DURATION_SOFT_CAP_SECONDS = 30
+    DURATION_HARD_PENALTY = 15.0
+
     def __init__(
         self,
         config: Config,
@@ -41,59 +66,105 @@ class YouTubeSearcher:
         self.log = logger
         self.app_cache = cache_manager
         self.proxy_manager = proxy_manager
-        self.cache: Dict[str, dict] = {}
         self._cookies_valid = validate_cookies_file(config.COOKIES_FILE)
-        self._load_cache()
+        max_workers = max(
+            1, int(getattr(self.cfg, "MAX_CONCURRENT_SEARCHES", 4)))
+        self._executor = ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="yt_search")
 
-    def _load_cache(self):
-        if os.path.exists(self.cfg.CACHE_FILE):
-            try:
-                with open(self.cfg.CACHE_FILE, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    now = time.time()
-                    ttl = self.cfg.CACHE_TTL_HOURS * 3600
-                    self.cache = {k: v for k, v in data.items() if now - v.get("_ts", 0) < ttl}
-                    self.log.debug(f"Caché cargado: {len(self.cache)} entradas")
-            except Exception as e:
-                self.log.debug(f"Error cargando caché: {e}")
+    def close(self):
+        """Release search executor resources."""
+        self._executor.shutdown(wait=False)
 
-    async def search(self, track: TrackMetadata, attempt: int = 1) -> SearchResult:
-        """Async search implementation"""
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
+    async def search(self, track: TrackMetadata) -> SearchResult:
+        """Async search implementation with global scoring across templates."""
         # 1. Check ISRC Cache
         if track.isrc:
             if self.app_cache:
-                cached = self.app_cache.get(f"isrc_{track.isrc}", ttl_hours=24 * 30)
+                cached = self.app_cache.get(
+                    f"isrc_{track.isrc}", ttl_hours=24 * 30)
                 if cached:
                     self.log.debug(f"Cache hit (ISRC): {track.title}")
                     return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
 
-            result = await self._lookup(f"isrc_{track.isrc}", f'"{track.isrc}"', track.duration_seconds)
-            if result:
-                return result
+            self.log.debug(
+                "ISRC sin cache: se omite lookup directo en YouTube para evitar falsos positivos")
 
-        # 2. Check Text Cache
-        query = f"{track.artist} - {track.title} Audio"
-        cache_key = query.lower().strip()[:100]
+        candidates: list[tuple[float, SearchResult]] = []
+
+        # 2. Try configurable text queries
+        for template in self.QUERY_TEMPLATES:
+            query = template.format(artist=track.artist, title=track.title)
+            cache_key = query.lower().strip()[:100]
+
+            if self.app_cache:
+                cached = self.app_cache.get(cache_key, ttl_hours=24 * 7)
+                if cached:
+                    self.log.debug(f"Cache hit: {track.title}")
+                    return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
+
+            result = await self._lookup(cache_key, query, track.duration_seconds)
+            if result:
+                candidates.append(result)
+
+        if not candidates:
+            raise NotFoundError(
+                f"No encontrado: {track.artist} - {track.title}")
+
+        best_score, best_result = max(candidates, key=lambda x: x[0])
+        self.log.debug(
+            f"Seleccionado global: {best_result.title[:50]} (score={best_score:+.2f})")
 
         if self.app_cache:
-            cached = self.app_cache.get(cache_key, ttl_hours=24 * 7)
-            if cached:
-                self.log.debug(f"Cache hit: {track.title}")
-                return SearchResult(cached["url"], cached["title"], cached["duration"], cached=True)
+            track_key = f"{track.artist} - {track.title}".lower().strip()[:100]
+            self.app_cache.set(
+                track_key,
+                {
+                    "url": best_result.url,
+                    "title": best_result.title,
+                    "duration": best_result.duration,
+                },
+            )
 
-        # 3. Lookup Text
-        result = await self._lookup(cache_key, query, track.duration_seconds)
-        if result:
-            return result
+            if track.isrc:
+                self.app_cache.set(
+                    f"isrc_{track.isrc}",
+                    {
+                        "url": best_result.url,
+                        "title": best_result.title,
+                        "duration": best_result.duration,
+                    },
+                )
 
-        # 4. Retry with alternate query if needed
-        if attempt < 2:
-            query_alt = f"{track.artist} {track.title} Topic"
-            result = await self._lookup(query_alt.lower()[:100], query_alt, track.duration_seconds)
-            if result:
-                return result
+        return best_result
 
-        raise NotFoundError(f"No encontrado: {track.artist} - {track.title}")
+    async def _extract_from_yt(self, query: str) -> Optional[list]:
+        """Extract YouTube search entries only (no cache decisions)."""
+        opts = await self._get_search_options()
+        loop = asyncio.get_running_loop()
+
+        try:
+            def _extract():
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    return ydl.extract_info(f"ytsearch5:{query}", download=False)
+
+            results = await loop.run_in_executor(self._executor, _extract)
+
+            if self.proxy_manager and "proxy" in opts:
+                self.proxy_manager.mark_success(opts["proxy"])
+
+            return (results or {}).get("entries") or []
+        except Exception as e:
+            self.log.debug(f"Error extracción yt-dlp: {e}")
+            if self.proxy_manager and "proxy" in opts:
+                self.proxy_manager.mark_failure(opts["proxy"])
+            return None
 
     async def _get_search_options(self) -> dict:
         """Configura las opciones de búsqueda de yt-dlp"""
@@ -103,7 +174,8 @@ class YouTubeSearcher:
             "extract_flat": True,
             "noplaylist": True,
             "socket_timeout": self.cfg.SEARCH_TIMEOUT,
-            "http_headers": {"User-Agent": random.choice(USER_AGENTS)},  # nosec B311
+            # nosec B311
+            "http_headers": {"User-Agent": random.choice(USER_AGENTS)},
         }
 
         if self.proxy_manager:
@@ -116,77 +188,112 @@ class YouTubeSearcher:
 
         return opts
 
-    async def _lookup(self, cache_key: str, query: str, duration: int) -> Optional[SearchResult]:
-        opts = await self._get_search_options()
+    async def _lookup(self, cache_key: str, query: str, duration: int) -> Optional[tuple[float, SearchResult]]:
+        entries = await self._extract_from_yt(query)
+        if not entries:
+            return None
 
-        try:
-            # Run blocking yt-dlp in executor
-            loop = asyncio.get_running_loop()
+        entries = [e for e in entries if e]
+        if not entries:
+            return None
 
-            def _extract():
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    return ydl.extract_info(f"ytsearch5:{query}", download=False)
+        scored = [(self._score_entry(e, query, duration), e)
+                  for e in entries if e]
 
-            # Using default thread executor
-            results = await loop.run_in_executor(None, _extract)
+        self.log.debug(f"Query: {query!r} | Candidatos:")
+        for score, entry in sorted(scored, key=lambda x: x[0], reverse=True):
+            self.log.debug(
+                f"  [{score:+.1f}] {entry.get('title', '')[:60]} ({entry.get('duration', 0)}s)")
 
-            if not results or "entries" not in results:
-                return None
+        valid = [(s, e) for s, e in scored if s > float("-inf")]
+        if not valid:
+            return None
 
-            entries = [e for e in results["entries"] if e]
-            if not entries:
-                return None
+        best_score, best_entry = max(valid, key=lambda x: x[0])
 
-            best_entry = self._filter_entries(entries, query, duration)
+        url = best_entry.get("webpage_url") or best_entry.get("url")
+        if not url:
+            self.log.debug("Entry sin URL válida, descartando")
+            return None
 
-            if best_entry:
-                url = best_entry.get("webpage_url") or best_entry.get("url")
-                sr = SearchResult(url=url, title=best_entry.get("title", ""), duration=best_entry.get("duration", 0))
+        sr = SearchResult(url=url, title=best_entry.get(
+            "title", ""), duration=best_entry.get("duration", 0))
+        self.log.debug(f"Encontrado: {sr.title[:50]}")
 
-                self.log.debug(f"Encontrado: {sr.title[:50]}")
+        if self.app_cache:
+            self.app_cache.set(
+                cache_key, {"url": sr.url, "title": sr.title, "duration": sr.duration})
 
-                if self.app_cache and sr.url:
-                    self.app_cache.set(cache_key, {"url": sr.url, "title": sr.title, "duration": sr.duration})
+        return best_score, sr
 
-                # Register proxy success
-                if self.proxy_manager and "proxy" in opts:
-                    self.proxy_manager.mark_success(opts["proxy"])
+    def _score_entry(self, entry: dict, query: str, duration: int) -> float:
+        """Compute relevance score for a candidate entry."""
+        entry_title = entry.get("title", "")
+        title_norm = self._normalize_for_phrase_match(entry_title)
+        title_tokens = set(re.findall(r"[a-z0-9]+", title_norm))
+        query_tokens = self._tokenize(query)
+        hard_excludes = set(self.HARD_EXCLUDES)
 
-                return sr
+        if title_tokens & hard_excludes and not query_tokens & hard_excludes:
+            self.log.debug(
+                f"Score descartado por exclude: {entry_title[:60]} | query={query!r}")
+            return float("-inf")
 
-        except Exception as e:
-            self.log.debug(f"Error búsqueda: {e}")
-            # Register proxy failure if applicable
-            if self.proxy_manager and "proxy" in opts:
-                self.proxy_manager.mark_failure(opts["proxy"])
+        score = 0.0
+        duration_penalty = 0.0
+        version_penalty = 0.0
 
-            # Return None to treat as 'not found' in this attempt
+        entry_duration = entry.get("duration", 0)
+        if duration and entry_duration:
+            diff = abs(entry_duration - duration)
+            if diff > self.DURATION_SOFT_CAP_SECONDS:
+                duration_penalty = self.DURATION_HARD_PENALTY
+            else:
+                duration_penalty = diff * 0.1
+            score -= duration_penalty
+        else:
+            diff = None
 
-        return None
+        overlap = len(query_tokens & title_tokens)
+        overlap_bonus = overlap * 2.0
+        score += overlap_bonus
 
-    def _filter_entries(self, entries: list, query: str, duration: int) -> Optional[dict]:
-        """Logic to filter best entry (Cpu bound but fast, can stay sync)"""
-        best_entry = None
-        best_diff = float("inf")
+        token_hits = len(title_tokens & self.VERSION_PENALTY_TOKENS)
+        phrase_hits = sum(
+            1 for phrase in self.VERSION_PENALTY_PHRASES if phrase in title_norm
+        )
+        version_hits_count = token_hits + phrase_hits
+        if version_hits_count:
+            version_penalty = version_hits_count * 2.0
+            score -= version_penalty
 
-        for entry in entries:
-            entry_duration = entry.get("duration", 0)
-            entry_title = entry.get("title", "").lower()
+        uploader = entry.get("uploader", "").lower()
+        topic_bonus = 0.0
+        if "- topic" in uploader:
+            topic_bonus = 1.5
+            score += topic_bonus
 
-            excludes = ["cover", "remix", "live", "karaoke", "instrumental"]
-            if any(x in entry_title for x in excludes):
-                if not any(x in query.lower() for x in excludes):
-                    continue
+        diff_text = "n/a" if diff is None else str(diff)
+        self.log.debug(
+            "Score detalle | "
+            f"title={entry_title[:60]!r} | "
+            f"query={query!r} | "
+            f"diff={diff_text} | "
+            f"dur_penalty={duration_penalty:.2f} | "
+            f"overlap={overlap} (+{overlap_bonus:.2f}) | "
+            f"version_penalty={version_penalty:.2f} | "
+            f"topic_bonus=+{topic_bonus:.2f} | "
+            f"total={score:+.2f}"
+        )
 
-            if duration and entry_duration:
-                diff = abs(entry_duration - duration)
-                if diff <= self.cfg.DURATION_TOLERANCE and diff < best_diff:
-                    best_diff = diff
-                    best_entry = entry
-            elif not best_entry:
-                best_entry = entry
+        return score
 
-        if not best_entry and entries:
-            best_entry = entries[0]
+    def _tokenize(self, text: str) -> set[str]:
+        """Normalize accents/symbols and return alphanumeric tokens."""
+        ascii_text = self._normalize_for_phrase_match(text)
+        return set(re.findall(r"[a-z0-9]+", ascii_text))
 
-        return best_entry
+    def _normalize_for_phrase_match(self, text: str) -> str:
+        """Normalize unicode text to lowercase ASCII for stable comparisons."""
+        normalized = unicodedata.normalize("NFD", text)
+        return normalized.encode("ascii", "ignore").decode("ascii").lower()

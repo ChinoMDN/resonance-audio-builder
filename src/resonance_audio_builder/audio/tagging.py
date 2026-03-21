@@ -3,7 +3,7 @@ from pathlib import Path
 
 from mutagen.mp4 import MP4, MP4Cover
 
-from resonance_audio_builder.audio.lyrics import fetch_lyrics
+from resonance_audio_builder.audio.lyrics import fetch_lyrics_with_info
 from resonance_audio_builder.audio.metadata import TrackMetadata
 from resonance_audio_builder.audio.musicbrainz import fetch_credits
 from resonance_audio_builder.core.logger import Logger
@@ -49,7 +49,8 @@ class MetadataWriter:
                 meta.producers = mb_credits.get("producers", [])
                 meta.engineers = mb_credits.get("engineers", [])
                 if meta.composers:
-                    self.log.debug(f"Fetched MusicBrainz credits for {meta.title}")
+                    self.log.debug(
+                        f"Fetched MusicBrainz credits for {meta.title}")
         except Exception as e:
             self.log.debug(f"Failed to fetch MusicBrainz credits: {e}")
 
@@ -66,10 +67,17 @@ class MetadataWriter:
 
         # --- 3. Letras (Lyrics) ---
         try:
-            lyrics = fetch_lyrics(meta.artist, meta.title, meta.duration_seconds)
+            lyrics, lyrics_type = fetch_lyrics_with_info(
+                meta.artist,
+                meta.title,
+                meta.album,
+                meta.duration_seconds,
+            )
             if lyrics:
                 audio["\xa9lyr"] = lyrics
-                self.log.debug(f"Lyrics embedded for: {meta.title}")
+                self.log.debug(
+                    f"Lyrics embedded for: {meta.title} (type={lyrics_type})"
+                )
         except Exception:
             pass
 
@@ -98,7 +106,8 @@ class MetadataWriter:
         if meta.release_date and len(meta.release_date) >= 4:
             audio["\xa9day"] = meta.release_date[:4]  # Año
         if meta.genres:
-            main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[0]
+            main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[
+                0]
             audio["\xa9gen"] = main_genre
 
     def _write_m4a_copyright_tags(self, audio, meta: TrackMetadata):

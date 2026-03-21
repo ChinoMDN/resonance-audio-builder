@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format follows **[Keep a Changelog](https://keepachangelog.com/en/1.0.0/)**
 This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)**.
 
+## [Unreleased]
+
+### Added
+
+- **YouTube Search Diagnostics:** Detailed candidate-scoring debug logs now include per-entry scoring details and per-query ranked candidates.
+- **Lyrics Debug Context:** Logs now indicate embedded lyric type (`synced` vs `plain`) to simplify metadata troubleshooting.
+
+### Changed
+
+- **YouTube Candidate Selection:** Search now evaluates all configured query templates and selects the global best-scored candidate instead of returning the first acceptable match.
+- **YouTube Scoring Heuristics:**
+    - Tokenized matching with Unicode normalization for more robust comparisons.
+    - Hybrid version penalties (token + phrase matching) to reduce false positives.
+    - Duration penalty uses a soft cap window and hard penalty only for larger mismatches.
+- **ISRC Handling:** Direct ISRC text search against YouTube is skipped to avoid low-signal false positives; ISRC remains used as a cache key.
+- **LRCLIB Retrieval Pipeline:** Lyrics lookup now uses `/api/get-cached` -> `/api/get` -> `/api/search` with full signature fields when available (`artist`, `title`, `album`, `duration`).
+
+### Fixed
+
+- **Cover CDN Stability:** Cover downloader now uses longer timeout windows, retry-with-backoff behavior for timeout-like failures, and skips proxy usage for Spotify CDN image fetches.
+- **Cover Diagnostics:** Added explicit debug logs for missing cover URL/data, empty cover responses, unknown image magic bytes, and cache-hit-empty scenarios.
+
 ## [8.5.0] – 2026-02-21
 
 ### Added
@@ -85,7 +107,7 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - **Improved Mocking Architecture:** Refined unit tests for `downloader` and `manager` with deterministic async mocks.
 - **Clean Dev Environment:** Silenced Python 3.13 `RuntimeWarnings` and tightened `.gitignore` for test artifacts.
 
-### [8.1.0] – 2026-01-25
+## [8.1.0] – 2026-01-25
 
 ### Added
 
@@ -176,7 +198,7 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [5.0.0] – 2024-01-24
+## [5.0.0] – 2026-01-24
 
 ### Added
 
@@ -204,7 +226,7 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [4.2.0] – 2024-01-23
+## [4.2.0] – 2026-01-23
 
 ### Added
 
@@ -223,7 +245,7 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [4.1.0] – 2024-01-22
+## [4.1.0] – 2026-01-22
 
 ### Added
 
@@ -238,7 +260,7 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [4.0.0] – 2024-01-21
+## [4.0.0] – 2026-01-21
 
 ### Added
 
@@ -261,7 +283,7 @@ This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.h
 
 ---
 
-## [3.0.0] – 2024-01-20
+## [3.0.0] – 2026-01-20
 
 ### Added
 
