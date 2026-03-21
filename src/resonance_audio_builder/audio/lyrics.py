@@ -37,8 +37,7 @@ def _extract_lyrics(payload: dict) -> tuple[Optional[str], str]:
 def _try_lrclib_endpoint(url: str, params: dict) -> Optional[tuple[Optional[str], str]]:
     """Try a single LRCLIB endpoint and extract lyrics if found."""
     try:
-        resp = requests.get(
-            url, params=params, timeout=5 if "search" in url else 10, headers=LRCLIB_HEADERS)
+        resp = requests.get(url, params=params, timeout=5 if "search" in url else 10, headers=LRCLIB_HEADERS)
         if resp.status_code == 200:
             lyrics, lyrics_type = _extract_lyrics(resp.json())
             if lyrics:
@@ -65,8 +64,7 @@ def _fetch_lrclib(artist: str, title: str, album: str = "", duration_sec: int = 
         }
 
         for endpoint in ["get-cached", "get"]:
-            result = _try_lrclib_endpoint(
-                f"https://lrclib.net/api/{endpoint}", params)
+            result = _try_lrclib_endpoint(f"https://lrclib.net/api/{endpoint}", params)
             if result:
                 return result
 
@@ -84,8 +82,7 @@ def _fetch_lrclib(artist: str, title: str, album: str = "", duration_sec: int = 
         )
         if resp.status_code == 200:
             results = resp.json()
-            data = results if isinstance(
-                results, dict) else results[0] if results else None
+            data = results if isinstance(results, dict) else results[0] if results else None
             if data:
                 lyrics, lyrics_type = _extract_lyrics(data)
                 if lyrics:
@@ -132,8 +129,7 @@ def fetch_lyrics_with_info(
     clean_title = _clean_title(title)
     clean_album = _clean_title(album) if album else ""
 
-    lyrics, lyrics_type = _fetch_lrclib(
-        clean_artist, clean_title, clean_album, duration_sec)
+    lyrics, lyrics_type = _fetch_lrclib(clean_artist, clean_title, clean_album, duration_sec)
     if lyrics:
         return lyrics, lyrics_type
 
