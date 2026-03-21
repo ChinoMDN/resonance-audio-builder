@@ -43,8 +43,7 @@ def print_header():
     """Display the application header banner."""
     console.print(
         Panel(
-            Align.center(
-                "[bold white]Resonance Music Downloader v8.1[/bold white]"),
+            Align.center("[bold white]Resonance Music Downloader v8.1[/bold white]"),
             border_style="cyan",
             padding=(1, 2),
             expand=True,
@@ -113,8 +112,7 @@ class RichUI:
             if self.live:
                 return
 
-            self.main_task = self.overall_progress.add_task(
-                "[cyan]Batch Progress", total=total)
+            self.main_task = self.overall_progress.add_task("[cyan]Batch Progress", total=total)
 
             self.layout = Layout()
             self.layout.split(
@@ -123,15 +121,13 @@ class RichUI:
                 Layout(name="footer", size=10),
             )
 
-            self.layout["main"].split_row(
-                Layout(name="active", ratio=2), Layout(name="stats", ratio=1))
+            self.layout["main"].split_row(Layout(name="active", ratio=2), Layout(name="stats", ratio=1))
 
             # Initial render
             self.make_layout()
 
             # Pass get_renderable=self.make_layout to auto-refresh
-            self.live = Live(get_renderable=self.make_layout,
-                             refresh_per_second=4, console=console, screen=True)
+            self.live = Live(get_renderable=self.make_layout, refresh_per_second=4, console=console, screen=True)
             self.live.start()
 
     def make_layout(self):
@@ -150,25 +146,20 @@ class RichUI:
             for _, info in tasks_snapshot:
                 # Usar shadow-state (UITask) para evitar acceso a _tasks (privado de Rich)
                 status = info.status
-                progress_bar = ProgressBar(
-                    total=info.total_bytes, completed=info.completed_bytes, width=20)
+                progress_bar = ProgressBar(total=info.total_bytes, completed=info.completed_bytes, width=20)
 
-                table.add_row(f"{info.artist} - {info.title}",
-                              status, progress_bar)
+                table.add_row(f"{info.artist} - {info.title}", status, progress_bar)
 
             if not tasks_snapshot:
                 table.add_row("[dim]Waiting for tasks...[/dim]", "", "")
 
             if self.layout:
-                self.layout["header"].update(
-                    Panel(self.overall_progress, border_style="cyan"))
-                self.layout["active"].update(
-                    Panel(table, title="Active Downloads", border_style="blue"))
+                self.layout["header"].update(Panel(self.overall_progress, border_style="cyan"))
+                self.layout["active"].update(Panel(table, title="Active Downloads", border_style="blue"))
 
             # Stats / Logs
             if self.cfg.DEBUG_MODE:
-                self.layout["footer"].update(
-                    Panel(self.log_text, title="Log", border_style="dim"))
+                self.layout["footer"].update(Panel(self.log_text, title="Log", border_style="dim"))
             else:
                 self.layout["footer"].visible = False
 
@@ -176,8 +167,7 @@ class RichUI:
             with self.lock:
                 pending_count = len(self.active_tasks)
 
-            stats_txt = Text.from_markup(
-                f"""
+            stats_txt = Text.from_markup(f"""
 [bold]Configuration[/bold]
 Mode: {self.cfg.MODE}
 Workers: {self.cfg.MAX_WORKERS}
@@ -185,10 +175,8 @@ Proxies: {'Enabled' if self.cfg.USE_PROXIES else 'Disabled'}
 
 [bold]Session[/bold]
 Active Workers: {pending_count}
-    """
-            )
-            self.layout["stats"].update(
-                Panel(stats_txt, title="Information", border_style="magenta"))
+    """)
+            self.layout["stats"].update(Panel(stats_txt, title="Information", border_style="magenta"))
 
             return self.layout
         except Exception as e:
@@ -214,11 +202,9 @@ Active Workers: {pending_count}
 
     def add_download_task(self, artist: str, title: str, total_bytes: int = 100) -> TaskID:
         """Register a new download task in the UI."""
-        tid = self.job_progress.add_task(
-            "download", total=total_bytes, status="Starting")
+        tid = self.job_progress.add_task("download", total=total_bytes, status="Starting")
         with self.lock:
-            self.active_tasks[tid] = UITask(
-                artist=artist, title=title, total_bytes=total_bytes)
+            self.active_tasks[tid] = UITask(artist=artist, title=title, total_bytes=total_bytes)
         return tid
 
     def update_task_status(self, task_id: TaskID, status: str):
@@ -268,7 +254,6 @@ Active Workers: {pending_count}
         t.add_row("Successful", str(stats.get("ok", 0)))
         t.add_row("Skipped", str(stats.get("skip", 0)))
         t.add_row("Failed", str(stats.get("error", 0)))
-        t.add_row("Total Data",
-                  f"{stats.get('bytes', 0) / (1024 * 1024):.2f} MB")
+        t.add_row("Total Data", f"{stats.get('bytes', 0) / (1024 * 1024):.2f} MB")
 
         console.print(t)

@@ -15,11 +15,9 @@ class CacheManager:
         with self.lock:
             try:
                 # check_same_thread=False allows sharing connection across threads if locked
-                self.conn = sqlite3.connect(
-                    self.db_path, check_same_thread=False)
+                self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
                 self.cursor = self.conn.cursor()
-                self.cursor.execute(
-                    """
+                self.cursor.execute("""
                     CREATE TABLE IF NOT EXISTS cache (
                         key TEXT PRIMARY KEY,
                         url TEXT,
@@ -27,8 +25,7 @@ class CacheManager:
                         duration INTEGER,
                         timestamp REAL
                     )
-                """
-                )
+                """)
                 self.conn.commit()
             except Exception as e:
                 print(f"[!] Cache DB Init Error: {e}")
@@ -41,8 +38,7 @@ class CacheManager:
         with self.lock:
             try:
                 self.cursor.execute(
-                    "SELECT url, title, duration FROM cache WHERE key = ? AND timestamp > ?", (
-                        key, limit_time)
+                    "SELECT url, title, duration FROM cache WHERE key = ? AND timestamp > ?", (key, limit_time)
                 )
                 row = self.cursor.fetchone()
                 if row:
@@ -62,8 +58,7 @@ class CacheManager:
                     INSERT OR REPLACE INTO cache (key, url, title, duration, timestamp)
                     VALUES (?, ?, ?, ?, ?)
                 """,
-                    (key, data["url"], data["title"],
-                     data.get("duration", 0), time.time()),
+                    (key, data["url"], data["title"], data.get("duration", 0), time.time()),
                 )
                 self.conn.commit()
             except Exception:
@@ -74,8 +69,7 @@ class CacheManager:
         if not hasattr(self, "cursor"):
             return
         # Use acquire with timeout to prevent deadlock
-        acquired = self.lock.acquire(
-            timeout=5)  # pylint: disable=consider-using-with
+        acquired = self.lock.acquire(timeout=5)  # pylint: disable=consider-using-with
         if not acquired:
             return
         try:
