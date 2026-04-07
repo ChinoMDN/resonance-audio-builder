@@ -165,7 +165,7 @@ class TestManagerFullCoverage:
         def fake_create_task(coro):
             # run() creates worker coroutines before handing them to create_task;
             # close them here so test doubles don't leak un-awaited coroutines.
-            if hasattr(coro, 'close'):
+            if hasattr(coro, "close"):
                 coro.close()
             task = asyncio.Future()
             task.set_result(None)
