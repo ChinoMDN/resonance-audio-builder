@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
 
+from mutagen.id3 import ID3, ID3NoHeaderError
 from mutagen.mp4 import MP4
 
 from resonance_audio_builder.audio.analysis import AudioAnalyzer
@@ -31,28 +32,34 @@ class AudioAuditor:
         self.analyzer = analyzer or AudioAnalyzer(logger)
 
     def scan_library(
-        self, hq_path: Path, mobile_path: Path = None, check_spectral: bool = False
+        self, hq_path: Path, mobile_path: Path = None, check_spectral: bool = False, progress_callback=None
     ) -> Dict[str, AuditResult]:
         """Scan HQ and optional Mobile library folders."""
         results = {}
 
         if hq_path.exists():
             self.log.info(f"Auditing HQ Library: {hq_path}")
-            results["HQ"] = self._audit_folder(hq_path, check_spectral=check_spectral)
+            results["HQ"] = self._audit_folder(
+                hq_path, check_spectral=check_spectral, progress_callback=progress_callback
+            )
 
         if mobile_path and mobile_path.exists():
             self.log.info(f"Auditing Mobile Library: {mobile_path}")
-            results["Mobile"] = self._audit_folder(mobile_path, check_spectral=False)
+            results["Mobile"] = self._audit_folder(
+                mobile_path, check_spectral=False, progress_callback=progress_callback
+            )
 
         return results
 
-    def _audit_folder(self, folder_path: Path, check_spectral: bool = False) -> AuditResult:
+    def _audit_folder(self, folder_path: Path, check_spectral: bool = False, progress_callback=None) -> AuditResult:
         result = AuditResult()
-        files = list(folder_path.rglob("*.m4a"))
+        files = list(folder_path.rglob("*.m4a")) + list(folder_path.rglob("*.mp3"))
         result.total_files = len(files)
 
         for file_path in files:
             self._audit_single_file(file_path, result, check_spectral)
+            if progress_callback:
+                progress_callback()
 
         return result
 
@@ -70,21 +77,39 @@ class AudioAuditor:
             result.errors.append(str(file_path))
 
     def _check_file_tags(self, file_path: Path, result: AuditResult) -> None:
-        """Check M4A tags for metadata, cover, and lyrics."""
+        """Check audio tags for metadata, cover, and lyrics."""
         try:
-            audio = MP4(file_path)
+            if file_path.suffix.lower() == ".mp3":
+                try:
+                    audio = ID3(file_path)
+                except ID3NoHeaderError:
+                    result.missing_metadata.append(file_path.name)
+                    result.missing_covers.append(file_path.name)
+                    result.missing_lyrics.append(file_path.name)
+                    return
 
-            # Check title and artist (iTunes atoms)
-            if "\xa9nam" not in audio or "\xa9ART" not in audio:
-                result.missing_metadata.append(file_path.name)
+                if "TIT2" not in audio or "TPE1" not in audio:
+                    result.missing_metadata.append(file_path.name)
 
-            # Check cover art
-            if "covr" not in audio:
-                result.missing_covers.append(file_path.name)
+                if not any(k.startswith("APIC") for k in audio.keys()):
+                    result.missing_covers.append(file_path.name)
 
-            # Check lyrics
-            if "\xa9lyr" not in audio:
-                result.missing_lyrics.append(file_path.name)
+                if not any(k.startswith("USLT") or k.startswith("SYLT") for k in audio.keys()):
+                    result.missing_lyrics.append(file_path.name)
+            else:
+                audio = MP4(file_path)
+
+                # Check title and artist (iTunes atoms)
+                if "\xa9nam" not in audio or "\xa9ART" not in audio:
+                    result.missing_metadata.append(file_path.name)
+
+                # Check cover art
+                if "covr" not in audio:
+                    result.missing_covers.append(file_path.name)
+
+                # Check lyrics
+                if "\xa9lyr" not in audio:
+                    result.missing_lyrics.append(file_path.name)
 
         except Exception as e:
             self.log.debug(f"Metadata error on {file_path.name}: {e}")

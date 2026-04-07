@@ -273,14 +273,13 @@ jobs:
             --hidden-import resonance_audio_builder \
             src/resonance_audio_builder/cli.py
 
-      - name: Test Executable (smoke test)
+      - name: Verify Executable created
         shell: bash
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            dist/ResonanceMusicBuilder.exe --help || echo "Help command failed"
+            test -f dist/ResonanceMusicBuilder.exe
           else
-            chmod +x dist/ResonanceMusicBuilder
-            dist/ResonanceMusicBuilder --help || echo "Help command failed"
+            test -f dist/ResonanceMusicBuilder
           fi
 
       - name: Upload Artifact
@@ -308,7 +307,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -e .
           pip install pytest-benchmark
 
       - name: Run benchmarks
@@ -337,10 +338,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Check for outdated packages
+      - name: Update dependencies with pur
         run: |
-          pip install -r requirements.txt
-          pip list --outdated --format=columns
+          pip install pur
+          pur -r requirements.txt
+          pur -r requirements-dev.txt
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6

@@ -93,6 +93,7 @@ safety-report.json
 pip-audit-report.txt
 
 # Benchmarks
+benchmark.json
 benchmark-results/
 .benchmarks/
 
