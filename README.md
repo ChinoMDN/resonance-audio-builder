@@ -60,7 +60,7 @@ Resonance focuses on **library quality and consistency**, providing:
 | **Multi-profile Encoding** | Configurable high and low bitrate audio profiles               |
 | **Audio Normalization**    | EBU R128 loudnorm for consistent perceived volume              |
 | **Embedded Lyrics**        | LRCLIB-first lyric retrieval with synced/plain diagnostics     |
-| **Smart Matching**         | Multi-template YouTube scoring with global best-candidate pick |
+| **Smart Matching**         | ISRC-first YouTube search with multi-query scoring fallback   |
 | **Resume Support**         | Checkpoint-based recovery for interrupted sessions             |
 | **Organized Output**       | Auto-sorts lists into subfolders                               |
 

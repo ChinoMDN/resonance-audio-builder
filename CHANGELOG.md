@@ -5,17 +5,28 @@ All notable changes to this project will be documented in this file.
 The format follows **[Keep a Changelog](https://keepachangelog.com/en/1.0.0/)**
 This project adheres to **[Semantic Versioning](https://semver.org/spec/v2.0.0.html)**.
 
-## [Unreleased]
+## [9.0.0] – 2026-04-07
+
+### Added
+
+- **ISRC-First YouTube Search**: Searches now prioritize ISRC codes as the primary lookup method, achieving near-100% accuracy for songs distributed through standard channels (DistroKid, TuneCore, etc.).
+- **Album-Disambiguated Queries**: For short/generic artist names (e.g., "Lee", "C418"), an additional query using the album name is performed to reduce false positives.
+- **Minimum Score Threshold**: A configurable `MIN_SCORE_THRESHOLD` (-5.0) rejects low-confidence matches instead of returning incorrect songs.
+- **Collaborative Artist Matching**: Search now validates each artist in multi-artist tracks (e.g., "Chalino Sanchez, Los Amables Del Norte") independently.
+- **Parenthetical Noise Filtering**: Tokens inside parentheses in video titles (e.g., "Official Video") are excluded from the overlap score when they don't appear in the search query.
 
 ### Changed
 
-- **CI/CD**: Aligned all code formatting and linting tools to 120-character line length for consistency
-    - Black formatter: `--line-length=120`
-    - isort: `--line-length=120 --profile=black`
-    - Flake8: `--max-line-length=120`
-    - Pylint: `--max-line-length=120`
-- **Testing**: Reduced minimum coverage threshold from 74% to 70% to reflect realistic project maturity
-- **Code Quality**: Reformatted database initialization and UI markup handling for strict Black compliance
+- **Query Cleaning**: Spotify suffixes like `(feat. ...)`, `(Remastered ...)`, `(From "...")`, and `- Deluxe Edition` are stripped from search queries before execution.
+- **Scoring Heuristics**: Overhauled scoring with exact artist phrase matching (+2.0), smarter Topic channel bonus (weighted by artist match: +3.0 vs +0.5), stronger artist mismatch penalty (-3.0), and increased duration/version penalties.
+- **Expanded Exclusion Lists**: Added "mashup", "tutorial", "reaction", "parodia", "parody" to hard excludes; added "reverb", "bass", "boosted", "extended", "acoustic", "unplugged", "stripped", "demo", "rehearsal" to version penalty tokens.
+- **Code Complexity**: Refactored `search()`, `_score_entry()`, and `_extract_from_invidious()` into smaller sub-methods to satisfy flake8 C901 (max-complexity=10).
+
+### Fixed
+
+- **M4A Encoding Corruption**: Fixed UTF-8 metadata corruption (e.g., "QuiÃ©n" → "Quién") caused by residual yt-dlp/ffmpeg metadata leaking into M4A tags. Tags are now cleared with `audio.clear()` before injection and NFC-normalized for consistent encoding in players like Musicolet.
+- **Retry Subfolder Routing**: Failed songs are now re-downloaded into their original playlist subfolder (preserved in `Failed_songs.csv`) instead of creating a new `Failed_songs/` folder.
+- **Trailing Whitespace**: Fixed minor whitespace issues in `cache.py`, `audit.py`, `metadata.py`, and `utils.py`.
 
 ## [8.5.0]
 

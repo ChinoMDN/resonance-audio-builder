@@ -5,6 +5,7 @@ import os
 import random
 import tempfile
 import time
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn, Optional, Tuple
@@ -312,6 +313,9 @@ class AudioDownloader:
         """Synchronous part of metadata injection for M4A (AAC)"""
         try:
             audio = MP4(str(file_path))
+            # Clear any residual metadata from yt-dlp/ffmpeg to prevent
+            # encoding corruption (e.g. UTF-8 read as Latin-1 → "QuiÃ©n")
+            audio.clear()
             self._apply_m4a_tags(audio, track)
             audio.save()
             self.log.debug(f"Metadatos inyectados: {track.title}")
@@ -323,20 +327,26 @@ class AudioDownloader:
         self._apply_m4a_basic_tags(audio, track)
         self._apply_m4a_extra_tags(audio, track)
 
+    @staticmethod
+    def _nfc(text: str) -> str:
+        """Normalize Unicode to NFC form for consistent M4A metadata."""
+        return unicodedata.normalize("NFC", text) if text else text
+
     def _apply_m4a_basic_tags(self, audio: MP4, track: TrackMetadata):
-        # Basic tags
+        # Basic tags — NFC-normalize all text to prevent encoding
+        # corruption in players like Musicolet
         if track.title:
-            audio["\xa9nam"] = [track.title]
+            audio["\xa9nam"] = [self._nfc(track.title)]
 
         # Artists - M4A handles lists correctly
         if track.artists:
-            audio["\xa9ART"] = track.artists
+            audio["\xa9ART"] = [self._nfc(a) for a in track.artists]
 
         if track.album:
-            audio["\xa9alb"] = [track.album]
+            audio["\xa9alb"] = [self._nfc(track.album)]
 
         if track.album_artist:
-            audio["aART"] = [track.album_artist]
+            audio["aART"] = [self._nfc(track.album_artist)]
 
         if track.release_date and len(track.release_date) >= 4:
             audio["\xa9day"] = [track.release_date[:4]]
@@ -344,7 +354,7 @@ class AudioDownloader:
         # Genre - take first from list
         if track.genres:
             first_genre = track.genre_list[0] if track.genre_list else track.genres.split(",")[0]
-            audio["\xa9gen"] = [first_genre.strip().title()]
+            audio["\xa9gen"] = [self._nfc(first_genre.strip().title())]
 
         # Label/Copyright
         if track.label:
@@ -352,7 +362,7 @@ class AudioDownloader:
 
         # Comment with Spotify URI
         if track.spotify_uri:
-            audio["\xa9cmt"] = [f"Spotify: {track.spotify_uri}"]
+            audio["\xa9cmt"] = [self._nfc(f"Spotify: {track.spotify_uri}")]
 
         # BPM/Tempo
         if track.tempo > 0:

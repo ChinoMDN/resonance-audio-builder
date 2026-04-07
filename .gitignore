@@ -23,6 +23,7 @@ ytdlp_raw.log.*
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+proxies.txt
 
 # Python
 __pycache__/
@@ -97,3 +98,7 @@ benchmark-results/
 
 # Build specs
 *.spec
+
+# User runtime data
+Playlists/*.csv
+!Playlists/.gitkeep

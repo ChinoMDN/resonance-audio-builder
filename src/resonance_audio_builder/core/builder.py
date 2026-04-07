@@ -192,9 +192,12 @@ class App:
             if rows:
                 for row in rows:
                     t = TrackMetadata.from_csv_row(row)
-                    setattr(t, "playlist_subfolder", playlist_name)
-                    # Initialize playlists list to track which playlists this song belongs to
-                    setattr(t, "playlists", [playlist_name])
+                    # Use the original playlist subfolder from the CSV row
+                    # (preserved in Failed_songs.csv) instead of the CSV filename
+                    original_subfolder = row.get("playlist_subfolder", "").strip()
+                    subfolder = original_subfolder if original_subfolder else playlist_name
+                    setattr(t, "playlist_subfolder", subfolder)
+                    setattr(t, "playlists", [subfolder])
                     all_tracks.append(t)
         return all_tracks
 

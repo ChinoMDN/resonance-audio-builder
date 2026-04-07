@@ -1,4 +1,5 @@
 import time
+import unicodedata
 from pathlib import Path
 
 from mutagen.mp4 import MP4, MP4Cover
@@ -57,9 +58,10 @@ class MetadataWriter:
         try:
             audio = MP4(path)
         except Exception:
-            # If failing to open, maybe it's corrupted or locked.
-            # Try passing simply path string
             audio = MP4(str(path))
+
+        # Clear residual metadata to prevent encoding corruption
+        audio.clear()
 
         self._write_m4a_basic_tags(audio, meta)
         self._write_m4a_numbers(audio, meta)
@@ -90,21 +92,26 @@ class MetadataWriter:
         self._write_m4a_copyright_tags(audio, meta)
         self._write_m4a_tool_tags(audio, meta)
 
+    @staticmethod
+    def _nfc(text: str) -> str:
+        """Normalize Unicode to NFC form for consistent metadata."""
+        return unicodedata.normalize("NFC", text) if text else text
+
     def _write_m4a_text_tags(self, audio, meta: TrackMetadata):
         """Write core text tags: title, artist, album, date, genre."""
         if meta.title:
-            audio["\xa9nam"] = meta.title
+            audio["\xa9nam"] = self._nfc(meta.title)
         if meta.artists:
-            audio["\xa9ART"] = meta.artists
+            audio["\xa9ART"] = [self._nfc(a) for a in meta.artists]
         if meta.album:
-            audio["\xa9alb"] = meta.album
+            audio["\xa9alb"] = self._nfc(meta.album)
         if meta.album_artist:
-            audio["aART"] = meta.album_artist
+            audio["aART"] = self._nfc(meta.album_artist)
         if meta.release_date and len(meta.release_date) >= 4:
             audio["\xa9day"] = meta.release_date[:4]  # Año
         if meta.genres:
             main_genre = meta.genre_list[0] if meta.genre_list else meta.genres.split(",")[0]
-            audio["\xa9gen"] = main_genre
+            audio["\xa9gen"] = self._nfc(main_genre)
 
     def _write_m4a_copyright_tags(self, audio, meta: TrackMetadata):
         """Write copyright and publisher tags."""
