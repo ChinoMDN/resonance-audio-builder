@@ -1,7 +1,14 @@
 import threading
 from collections import deque
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
+from pathlib import Path
 from typing import Dict, Optional
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # For Python < 3.11 if ever needed, though user is on 3.13
 
 from rich.align import Align
 from rich.console import Console
@@ -39,11 +46,33 @@ class UITask:
     completed_bytes: int = 0
 
 
+def get_app_version() -> str:
+    """Retrieve application version dynamically from metadata or pyproject.toml."""
+    try:
+        return version("resonance-audio-builder")
+    except PackageNotFoundError:
+        pass
+
+    try:
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
+        pyproject_path = project_root / "pyproject.toml"
+        if pyproject_path.exists():
+            with open(pyproject_path, "rb") as f:
+                return tomllib.load(f)["project"]["version"]
+    except Exception:
+        pass
+
+    return "9.0.0"  # Safe Fallback
+
+
+APP_VERSION = get_app_version()
+
+
 def print_header():
     """Display the application header banner."""
     console.print(
         Panel(
-            Align.center("[bold white]Resonance Music Downloader v8.1[/bold white]"),
+            Align.center(f"[bold white]Resonance Music Downloader v{APP_VERSION}[/bold white]"),
             border_style="cyan",
             padding=(1, 2),
             expand=True,
