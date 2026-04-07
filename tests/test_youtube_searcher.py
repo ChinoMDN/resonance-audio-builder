@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -81,9 +81,7 @@ class TestYouTubeSearcher:
     async def test_isrc_lookup_returns_match(self, searcher, mock_youtube_api):
         """ISRC search should find the exact song with matching duration"""
         mock_youtube_api.extract_info.return_value = {
-            "entries": [
-                {"title": "Lee - Rain", "duration": 229, "webpage_url": "https://yt/isrc_hit"}
-            ]
+            "entries": [{"title": "Lee - Rain", "duration": 229, "webpage_url": "https://yt/isrc_hit"}]
         }
         track = TrackMetadata("id_isrc", "Rain", "Lee", isrc="KRMIM2006387", duration_ms=229090)
         res = await searcher.search(track)
@@ -95,9 +93,7 @@ class TestYouTubeSearcher:
         # First call: ISRC lookup returns wrong duration
         # Subsequent calls: text search returns nothing
         mock_youtube_api.extract_info.return_value = {
-            "entries": [
-                {"title": "Wrong Song", "duration": 500, "webpage_url": "https://yt/wrong"}
-            ]
+            "entries": [{"title": "Wrong Song", "duration": 500, "webpage_url": "https://yt/wrong"}]
         }
         track = TrackMetadata("id_dur", "Rain", "Lee", isrc="KRMIM2006387", duration_ms=229090)
         with pytest.raises(NotFoundError):
@@ -107,20 +103,20 @@ class TestYouTubeSearcher:
 
     def test_clean_query_title_removes_feat(self, searcher):
         """Should strip (feat. ...) from Spotify titles"""
-        assert searcher._clean_query_title('Bad Guy (feat. Justin Bieber)') == 'Bad Guy'
+        assert searcher._clean_query_title("Bad Guy (feat. Justin Bieber)") == "Bad Guy"
 
     def test_clean_query_title_removes_remastered(self, searcher):
         """Should strip - Remastered XXXX suffixes"""
-        assert searcher._clean_query_title('Song Title - Remastered 2023') == 'Song Title'
+        assert searcher._clean_query_title("Song Title - Remastered 2023") == "Song Title"
 
     def test_clean_query_title_preserves_normal(self, searcher):
         """Should not modify titles without Spotify suffixes"""
-        assert searcher._clean_query_title('Alma Enamorada') == 'Alma Enamorada'
+        assert searcher._clean_query_title("Alma Enamorada") == "Alma Enamorada"
 
     def test_clean_query_title_removes_from_quotes(self, searcher):
         """Should strip (From 'Movie Name') suffixes"""
         result = searcher._clean_query_title('I Love You So (From "Junko Ohashi")')
-        assert result == 'I Love You So'
+        assert result == "I Love You So"
 
     # ── Short artist detection ──────────────────────────────────────
 
@@ -171,9 +167,8 @@ class TestYouTubeSearcher:
             ]
         }
         track = TrackMetadata(
-            "id_collab", "Alma Enamorada",
-            "Chalino Sanchez, Los Amables Del Norte",
-            duration_ms=175891)
+            "id_collab", "Alma Enamorada", "Chalino Sanchez, Los Amables Del Norte", duration_ms=175891
+        )
         res = await searcher.search(track)
         assert res.url == "https://yt/chalino"
 
@@ -181,8 +176,7 @@ class TestYouTubeSearcher:
 
     def test_strip_parenthetical_tokens(self, searcher):
         """Tokens inside parentheses not in query should be excluded"""
-        tokens = searcher._strip_parenthetical_tokens(
-            "Song Title (Official Music Video)", "Song Title Audio")
+        tokens = searcher._strip_parenthetical_tokens("Song Title (Official Music Video)", "Song Title Audio")
         assert "official" not in tokens
         assert "music" not in tokens
         assert "video" not in tokens
