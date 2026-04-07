@@ -128,26 +128,26 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: "pip"
 
-      - name: Setup FFmpeg (Linux/Windows)
-        if: matrix.os != 'macos-latest'
-        uses: FedericoCarboni/setup-ffmpeg@v3
-        with:
-          ffmpeg-version: release
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install FFmpeg (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
 
-      - name: Setup FFmpeg (MacOS)
-        if: matrix.os == 'macos-latest'
-        run: brew install ffmpeg
-
-      - name: Cache FFmpeg (Windows)
+      - name: Install FFmpeg (Windows)
         if: matrix.os == 'windows-latest'
-        uses: actions/cache@v4
-        with:
-          path: C:\ProgramData\chocolatey\lib\ffmpeg
-          key: ${{ runner.os }}-ffmpeg
+        shell: pwsh
+        run: |
+          choco install ffmpeg --no-progress -y
+          ffmpeg -version
 
-      - name: Verify FFmpeg installation
-        run: ffmpeg -version
+      - name: Install FFmpeg (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install ffmpeg
+          ffmpeg -version
 
       - name: Install dependencies
         run: |
@@ -214,10 +214,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
 
-      - name: Setup FFmpeg
-        uses: FedericoCarboni/setup-ffmpeg@v3
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
 
       - name: Install dependencies
         run: |
