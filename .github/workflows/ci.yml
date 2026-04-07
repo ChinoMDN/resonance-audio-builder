@@ -85,15 +85,12 @@ jobs:
           cache: "pip"
 
       - name: Install security tools
-        run: pip install bandit safety pip-audit
+        run: pip install bandit pip-audit
 
       - name: Run Bandit (code security)
         run: |
           bandit -r src/ -f json -o bandit-report.json || true
           bandit -r src/ --severity-level medium --confidence-level medium
-
-      - name: Check dependencies with Safety
-        run: safety check --json > safety-report.json
 
       - name: Audit with pip-audit
         run: pip-audit -r requirements.txt --desc > pip-audit-report.txt
@@ -105,7 +102,6 @@ jobs:
           name: security-reports
           path: |
             bandit-report.json
-            safety-report.json
             pip-audit-report.txt
           retention-days: 90
 
