@@ -338,8 +338,8 @@ jobs:
 
       - name: Check for outdated packages
         run: |
-          pip install pip-upgrader
-          pip-upgrade requirements.txt
+          pip install -r requirements.txt
+          pip list --outdated --format=columns
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6
