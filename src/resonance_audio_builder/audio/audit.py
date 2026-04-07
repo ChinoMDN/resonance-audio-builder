@@ -80,40 +80,47 @@ class AudioAuditor:
         """Check audio tags for metadata, cover, and lyrics."""
         try:
             if file_path.suffix.lower() == ".mp3":
-                try:
-                    audio = ID3(file_path)
-                except ID3NoHeaderError:
-                    result.missing_metadata.append(file_path.name)
-                    result.missing_covers.append(file_path.name)
-                    result.missing_lyrics.append(file_path.name)
-                    return
-
-                if "TIT2" not in audio or "TPE1" not in audio:
-                    result.missing_metadata.append(file_path.name)
-
-                if not any(k.startswith("APIC") for k in audio.keys()):
-                    result.missing_covers.append(file_path.name)
-
-                if not any(k.startswith("USLT") or k.startswith("SYLT") for k in audio.keys()):
-                    result.missing_lyrics.append(file_path.name)
+                self._check_mp3_tags(file_path, result)
             else:
-                audio = MP4(file_path)
-
-                # Check title and artist (iTunes atoms)
-                if "\xa9nam" not in audio or "\xa9ART" not in audio:
-                    result.missing_metadata.append(file_path.name)
-
-                # Check cover art
-                if "covr" not in audio:
-                    result.missing_covers.append(file_path.name)
-
-                # Check lyrics
-                if "\xa9lyr" not in audio:
-                    result.missing_lyrics.append(file_path.name)
-
+                self._check_m4a_tags(file_path, result)
         except Exception as e:
             self.log.debug(f"Metadata error on {file_path.name}: {e}")
             result.errors.append(f"{file_path.name}: Tag Error")
+
+    def _check_mp3_tags(self, file_path: Path, result: AuditResult) -> None:
+        """Internal helper to check MP3 tags."""
+        try:
+            audio = ID3(file_path)
+        except ID3NoHeaderError:
+            result.missing_metadata.append(file_path.name)
+            result.missing_covers.append(file_path.name)
+            result.missing_lyrics.append(file_path.name)
+            return
+
+        if "TIT2" not in audio or "TPE1" not in audio:
+            result.missing_metadata.append(file_path.name)
+
+        if not any(k.startswith("APIC") for k in audio.keys()):
+            result.missing_covers.append(file_path.name)
+
+        if not any(k.startswith("USLT") or k.startswith("SYLT") for k in audio.keys()):
+            result.missing_lyrics.append(file_path.name)
+
+    def _check_m4a_tags(self, file_path: Path, result: AuditResult) -> None:
+        """Internal helper to check M4A tags."""
+        audio = MP4(file_path)
+
+        # Check title and artist (iTunes atoms)
+        if "\xa9nam" not in audio or "\xa9ART" not in audio:
+            result.missing_metadata.append(file_path.name)
+
+        # Check cover art
+        if "covr" not in audio:
+            result.missing_covers.append(file_path.name)
+
+        # Check lyrics
+        if "\xa9lyr" not in audio:
+            result.missing_lyrics.append(file_path.name)
 
     def _check_spectral_integrity(self, file_path: Path, result: AuditResult) -> None:
         """Check if file is genuine HQ using spectral analysis."""
