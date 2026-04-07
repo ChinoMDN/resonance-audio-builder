@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from rich.panel import Panel
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.prompt import Prompt
 from rich.table import Table
 
@@ -336,10 +337,6 @@ class App:
         deleted = self._perform_clear(sel)
         if deleted:
             console.print(f"[green]Deleted: {', '.join(deleted)}[/green]")
-        Prompt.ask("\nPress ENTER to continue")
-
-        if deleted:
-            console.print(f"[green]Deleted: {', '.join(deleted)}[/green]")
         else:
             console.print("[dim]Nothing to delete.[/dim]")
 
@@ -357,21 +354,39 @@ class App:
         console.clear()
         print_header()
 
-        with console.status("[bold cyan]Scanning library...") as _:
-            auditor = AudioAuditor(self.log)
-            # Decide whether to perform spectral analysis (slow)
+        check_spectral = Prompt.ask("Perform spectral analysis? (Slow)", choices=["y", "n"], default="n") == "y"
 
-            hq_path = Path(self.cfg.OUTPUT_FOLDER_HQ)
-            mob_path = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
+        auditor = AudioAuditor(self.log)
+        hq_path = Path(self.cfg.OUTPUT_FOLDER_HQ)
+        mob_path = Path(self.cfg.OUTPUT_FOLDER_MOBILE)
 
-            check_spectral = Prompt.ask("Perform spectral analysis? (Slow)", choices=["y", "n"], default="n") == "y"
+        total_files = 0
+        if hq_path.exists():
+            total_files += len(list(hq_path.rglob("*.m4a"))) + len(list(hq_path.rglob("*.mp3")))
+        if mob_path.exists():
+            total_files += len(list(mob_path.rglob("*.m4a"))) + len(list(mob_path.rglob("*.mp3")))
 
-            results = auditor.scan_library(hq_path, mob_path, check_spectral=check_spectral)
-
-        if not results:
+        if total_files == 0:
             console.print("[yellow]No audio folders found to audit.[/yellow]")
             console.input("\n[bold cyan]Press ENTER to return...[/bold cyan]")
             return
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            TextColumn("({task.completed}/{task.total})"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("[cyan]Scanning library...", total=total_files)
+
+            def update_progress():
+                progress.advance(task)
+
+            results = auditor.scan_library(
+                hq_path, mob_path, check_spectral=check_spectral, progress_callback=update_progress
+            )
 
         for name, res in results.items():
             table = Table(title=f"Library Audit: {name}", show_header=True, header_style="bold magenta", expand=True)
@@ -401,9 +416,8 @@ class App:
             console.print(table)
 
             if res.fake_hq_detected:
-                with console.expander("Show Fake HQ Files"):  # pylint: disable=no-member
-                    for f in res.fake_hq_detected:
-                        console.print(f" [red]![/red] {f}")
+                fake_list = "\n".join([f" [red]![/red] {f}" for f in res.fake_hq_detected])
+                console.print(Panel(fake_list, title="Fake HQ Files", border_style="red"))
 
         console.input("\n[bold cyan]Press ENTER to return...[/bold cyan]")
 

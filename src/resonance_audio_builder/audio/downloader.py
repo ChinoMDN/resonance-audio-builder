@@ -455,7 +455,6 @@ class AudioDownloader:
             "extractor_args": {
                 "youtube": {
                     "player_client": ["android", "web"],
-                    "po_token": ["web+web_embedded_player"],
                 }
             },
         }

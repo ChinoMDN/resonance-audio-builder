@@ -98,13 +98,14 @@ class DownloadManager:
 
         # Wait for queue to empty
         try:
-            while not self.queue.empty():
+            join_task = asyncio.create_task(self.queue.join())
+            while not join_task.done():
                 if self.keyboard.should_quit():
                     break
-                await asyncio.sleep(0.5)
-
-            if not self.keyboard.should_quit():
-                await self.queue.join()
+                # Only wait a short time to poll keyboard state
+                done, pending = await asyncio.wait([join_task], timeout=0.5)
+                if done:
+                    break
 
         except asyncio.CancelledError:
             pass
@@ -121,6 +122,7 @@ class DownloadManager:
 
             self.keyboard.stop()
             self.ui.stop()
+            self.searcher.close()
             self._save_failed()
             self._print_summary()
 
